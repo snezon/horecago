@@ -1,7 +1,20 @@
 import Link from "next/link";
-import { ArrowRight, Building2, UserRound, Clock, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  ArrowRight, Building2, UserRound, Clock, ShieldCheck, Sparkles,
+  MapPin, Users, Wallet,
+} from "lucide-react";
+import { prisma } from "@/lib/db";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const previewVacancies = await prisma.vacancy.findMany({
+    where: { status: "OPEN" },
+    orderBy: { createdAt: "desc" },
+    include: { position: true, hr: { include: { hrProfile: true } } },
+    take: 6,
+  });
+
   return (
     <div className="space-y-20">
       {/* Hero */}
@@ -25,12 +38,64 @@ export default function Home() {
               Я ищу сотрудников
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link href="/login?role=WORKER" className="btn-secondary !px-6 !py-3 text-base">
-              Я ищу работу
+            <Link href="/feed" className="btn-secondary !px-6 !py-3 text-base">
+              Смотреть вакансии
             </Link>
           </div>
         </div>
       </section>
+
+      {/* Vacancies preview */}
+      {previewVacancies.length > 0 && (
+        <section>
+          <div className="flex items-end justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-1">Свежие вакансии</h2>
+              <p className="text-sm text-ink-500">Открытые позиции в HoReCa, которые ждут кандидатов</p>
+            </div>
+            <Link href="/feed" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-900 hover:gap-2.5 transition-all">
+              Смотреть все
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {previewVacancies.map((v) => {
+              const slotsLeft = v.headcount - v.hiredCount;
+              return (
+                <li key={v.id}>
+                  <Link href={`/vacancy/${v.id}`} className="card-interactive block h-full">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <span className="badge-neutral">{v.position.name}</span>
+                      <span className="badge-warning">
+                        <Users className="w-3 h-3" />
+                        {slotsLeft}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-ink-900 leading-snug mb-3 line-clamp-2">{v.title}</h3>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center gap-2 text-ink-700">
+                        <Building2 className="w-3.5 h-3.5 text-ink-400 shrink-0" />
+                        <span className="truncate">{v.hr.hrProfile?.hotelName}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-ink-500">
+                        <MapPin className="w-3.5 h-3.5 text-ink-400 shrink-0" />
+                        <span className="truncate">{v.address}</span>
+                      </div>
+                      {v.salary && (
+                        <div className="flex items-center gap-2 text-ink-900 font-medium pt-1">
+                          <Wallet className="w-3.5 h-3.5 text-accent-500 shrink-0" />
+                          {v.salary}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Role cards */}
       <section className="grid sm:grid-cols-2 gap-5">
@@ -75,7 +140,7 @@ export default function Home() {
         <Feature
           icon={<Sparkles className="w-5 h-5 text-accent-500" />}
           title="Просто и честно"
-          text="Контакты обеих сторон сразу. Закрылась вакансия — отклик мягко завершается, без жёстких отказов."
+          text="Контакты обеих сторон сразу. Закрылась вакансия — отклик мягко завершается."
         />
       </section>
     </div>
@@ -84,7 +149,7 @@ export default function Home() {
 
 function RoleCard({
   href, icon, title, subtitle, bullets, cta,
-}: { href: string; icon: React.ReactNode; title: string; subtitle: string; bullets: string[]; cta: string; }) {
+}: { href: string; icon: React.ReactNode; title: string; subtitle: string; bullets: string[]; cta: string }) {
   return (
     <Link href={href} className="card-interactive group flex flex-col">
       <div className="flex items-center gap-3 mb-1">

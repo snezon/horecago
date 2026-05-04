@@ -56,7 +56,12 @@ export default async function RootLayout({
                   </button>
                 </form>
               ) : (
-                <Link href="/login" className="btn-secondary !py-2 text-sm">Войти</Link>
+                <>
+                  <Link href="/login?role=HR" className="btn-ghost !py-2 hidden sm:inline-flex">
+                    Опубликовать вакансию
+                  </Link>
+                  <Link href="/login" className="btn-primary !py-2 text-sm">Войти</Link>
+                </>
               )}
             </nav>
           </div>

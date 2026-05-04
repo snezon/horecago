@@ -2,6 +2,8 @@ import Link from "next/link";
 import { MapPin, Users, Wallet, Building2 } from "lucide-react";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function FeedPage({ searchParams }: { searchParams: { position?: string } }) {
   const positions = await prisma.position.findMany({ orderBy: { id: "asc" } });
   const filter = searchParams.position ? Number(searchParams.position) : null;
