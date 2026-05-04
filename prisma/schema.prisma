@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  role      String   // "HR" | "WORKER"
+  name      String?
+  phone     String?
+  createdAt DateTime @default(now())
+
+  hrProfile     HRProfile?
+  workerProfile WorkerProfile?
+  vacancies     Vacancy[]
+  applications  Application[]
+  sessions      Session[]
+}
+
+model HRProfile {
+  userId    String  @id
+  hotelName String
+  address   String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkerProfile {
+  userId  String   @id
+  about   String?
+  address String?
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills  WorkerSkill[]
+  documents Document[]
+}
+
+model Position {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  vacancies Vacancy[]
+  workers   WorkerSkill[]
+}
+
+model WorkerSkill {
+  workerId   String
+  positionId Int
+  worker     WorkerProfile @relation(fields: [workerId], references: [userId], onDelete: Cascade)
+  position   Position      @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@id([workerId, positionId])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  workerId  String
+  kind      String   // "PASSPORT" | "MED_BOOK" | "OTHER"
+  filename  String
+  url       String
+  createdAt DateTime @default(now())
+  worker    WorkerProfile @relation(fields: [workerId], references: [userId], onDelete: Cascade)
+}
+
+model Vacancy {
+  id          String   @id @default(cuid())
+  hrId        String
+  positionId  Int
+  title       String
+  description String
+  salary      String?
+  address     String
+  headcount   Int      @default(1)
+  hiredCount  Int      @default(0)
+  status      String   @default("OPEN") // "OPEN" | "CLOSED"
+  createdAt   DateTime @default(now())
+
+  hr           User          @relation(fields: [hrId], references: [id], onDelete: Cascade)
+  position     Position      @relation(fields: [positionId], references: [id])
+  applications Application[]
+}
+
+model Application {
+  id        String   @id @default(cuid())
+  vacancyId String
+  workerId  String
+  status    String   @default("PENDING") // "PENDING" | "HIRED" | "REJECTED"
+  createdAt DateTime @default(now())
+
+  vacancy Vacancy @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  worker  User    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([vacancyId, workerId])
+}
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  role      String?  // role hint at signup time
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
