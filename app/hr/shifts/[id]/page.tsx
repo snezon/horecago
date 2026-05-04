@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Phone, Mail, MapPin, FileText, CheckCircle2, X } from "lucide-react";
+import {
+  ArrowLeft, Phone, Mail, MapPin, FileText, CheckCircle2, X, Calendar, Wallet,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { updateVacancy, hireApplicant, rejectApplicant } from "../actions";
+import { updateShift, hireApplicant, rejectApplicant } from "../actions";
+import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
 
 const kindLabel: Record<string, string> = {
   PASSPORT: "Паспорт",
@@ -11,12 +14,12 @@ const kindLabel: Record<string, string> = {
   OTHER: "Другое",
 };
 
-export default async function HRVacancyPage({ params }: { params: { id: string } }) {
+export default async function HRShiftPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=HR");
   if (user.role !== "HR") redirect("/");
 
-  const vacancy = await prisma.vacancy.findUnique({
+  const shift = await prisma.shift.findUnique({
     where: { id: params.id },
     include: {
       position: true,
@@ -32,9 +35,9 @@ export default async function HRVacancyPage({ params }: { params: { id: string }
       },
     },
   });
-  if (!vacancy || vacancy.hrId !== user.id) notFound();
+  if (!shift || shift.hrId !== user.id) notFound();
 
-  const workerIds = vacancy.applications.map((a) => a.workerId);
+  const workerIds = shift.applications.map((a) => a.workerId);
   const docs = workerIds.length
     ? await prisma.document.findMany({ where: { workerId: { in: workerIds } } })
     : [];
@@ -45,11 +48,11 @@ export default async function HRVacancyPage({ params }: { params: { id: string }
     docsByWorker.set(d.workerId, list);
   }
 
-  const pending = vacancy.applications.filter((a) => a.status === "PENDING");
-  const hired = vacancy.applications.filter((a) => a.status === "HIRED");
-  const rejected = vacancy.applications.filter((a) => a.status === "REJECTED");
+  const pending = shift.applications.filter((a) => a.status === "PENDING");
+  const hired = shift.applications.filter((a) => a.status === "HIRED");
+  const rejected = shift.applications.filter((a) => a.status === "REJECTED");
 
-  const progress = (vacancy.hiredCount / vacancy.headcount) * 100;
+  const progress = (shift.hiredCount / shift.headcount) * 100;
 
   return (
     <div className="space-y-6">
@@ -57,21 +60,25 @@ export default async function HRVacancyPage({ params }: { params: { id: string }
         <ArrowLeft className="w-4 h-4" /> К дашборду
       </Link>
 
-      {/* Vacancy header */}
       <article className="card">
         <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="badge-neutral">{vacancy.position.name}</span>
-              {vacancy.status === "CLOSED" && <span className="badge-muted">Закрыта</span>}
+              <span className="badge-neutral">{shift.position.name}</span>
+              {shift.status === "CLOSED" && <span className="badge-muted">Закрыта</span>}
             </div>
-            <h1 className="text-2xl font-bold">{vacancy.title}</h1>
+            <h1 className="text-2xl font-bold">{shift.title}</h1>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-600 mt-2">
+              <span className="inline-flex items-center gap-1.5"><Calendar className="w-4 h-4 text-ink-400" /> {shiftLabel(shift.shiftStart, shift.shiftEnd)}</span>
+              <span className="inline-flex items-center gap-1.5"><Wallet className="w-4 h-4 text-ink-400" /> {formatRub(shift.payment)} ₽{shift.paymentNote ? " " + shift.paymentNote : ""}</span>
+              <span className="inline-flex items-center gap-1.5"><MapPin className="w-4 h-4 text-ink-400" /> {shift.address}</span>
+            </div>
           </div>
           <div className="text-right shrink-0">
             <div className="text-3xl font-bold text-ink-900">
-              {vacancy.hiredCount}<span className="text-ink-400 text-lg font-normal"> / {vacancy.headcount}</span>
+              {shift.hiredCount}<span className="text-ink-400 text-lg font-normal"> / {shift.headcount}</span>
             </div>
-            <div className="text-xs text-ink-500 uppercase tracking-wide">нанято</div>
+            <div className="text-xs text-ink-500 uppercase tracking-wide">подтверждено</div>
           </div>
         </div>
 
@@ -80,44 +87,57 @@ export default async function HRVacancyPage({ params }: { params: { id: string }
         </div>
 
         <details className="text-sm">
-          <summary className="cursor-pointer text-ink-600 hover:text-ink-900 select-none">Редактировать вакансию</summary>
-          <form action={updateVacancy} className="space-y-4 mt-4 pt-4 border-t border-ink-200/70">
-            <input type="hidden" name="id" value={vacancy.id} />
+          <summary className="cursor-pointer text-ink-600 hover:text-ink-900 select-none">Редактировать смену</summary>
+          <form action={updateShift} className="space-y-4 mt-4 pt-4 border-t border-ink-200/70">
+            <input type="hidden" name="id" value={shift.id} />
             <div>
               <label className="label">Заголовок</label>
-              <input name="title" defaultValue={vacancy.title} className="input" />
+              <input name="title" defaultValue={shift.title} className="input" />
             </div>
             <div>
               <label className="label">Описание</label>
-              <textarea name="description" defaultValue={vacancy.description} className="input min-h-[100px]" />
+              <textarea name="description" defaultValue={shift.description} className="input min-h-[100px]" />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label">Начало</label>
+                <input name="shiftStart" type="datetime-local" defaultValue={toLocalInput(shift.shiftStart)} className="input" />
+              </div>
+              <div>
+                <label className="label">Конец</label>
+                <input name="shiftEnd" type="datetime-local" defaultValue={toLocalInput(shift.shiftEnd)} className="input" />
+              </div>
             </div>
             <div className="grid sm:grid-cols-3 gap-3">
               <div>
-                <label className="label">Зарплата</label>
-                <input name="salary" defaultValue={vacancy.salary ?? ""} className="input" />
+                <label className="label">Оплата ₽</label>
+                <input name="payment" type="number" min={0} defaultValue={shift.payment} className="input" />
               </div>
               <div>
-                <label className="label">Адрес</label>
-                <input name="address" defaultValue={vacancy.address} className="input" />
+                <label className="label">Доп.</label>
+                <input name="paymentNote" defaultValue={shift.paymentNote ?? ""} className="input" />
               </div>
               <div>
                 <label className="label">Headcount</label>
-                <input name="headcount" type="number" min={vacancy.hiredCount} defaultValue={vacancy.headcount} className="input" />
+                <input name="headcount" type="number" min={shift.hiredCount} defaultValue={shift.headcount} className="input" />
               </div>
+            </div>
+            <div>
+              <label className="label">Адрес</label>
+              <input name="address" defaultValue={shift.address} className="input" />
             </div>
             <button className="btn-secondary">Сохранить</button>
           </form>
         </details>
       </article>
 
-      {/* Pending applications */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="section-title">Новые отклики</h2>
+          <h2 className="section-title">Новые заявки</h2>
           <span className="text-sm text-ink-500">{pending.length}</span>
         </div>
         {pending.length === 0 ? (
-          <div className="card text-center text-sm text-ink-500 py-8">Новых откликов нет</div>
+          <div className="card text-center text-sm text-ink-500 py-8">Заявок нет</div>
         ) : (
           <ul className="space-y-3">
             {pending.map((a) => {
@@ -156,7 +176,7 @@ export default async function HRVacancyPage({ params }: { params: { id: string }
                         <input type="hidden" name="appId" value={a.id} />
                         <button className="btn-accent">
                           <CheckCircle2 className="w-4 h-4" />
-                          Нанять
+                          Подтвердить
                         </button>
                       </form>
                       <form action={rejectApplicant}>
@@ -205,7 +225,7 @@ export default async function HRVacancyPage({ params }: { params: { id: string }
       {hired.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="section-title">Нанятые</h2>
+            <h2 className="section-title">Подтверждённые</h2>
             <span className="text-sm text-ink-500">{hired.length}</span>
           </div>
           <ul className="grid sm:grid-cols-2 gap-3">

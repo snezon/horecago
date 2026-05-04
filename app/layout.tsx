@@ -43,9 +43,9 @@ export default async function RootLayout({
               {user?.role === "HR" && (
                 <>
                   <NavLink href="/hr" icon={<LayoutDashboard className="w-4 h-4" />} label="Дашборд" />
-                  <Link href="/hr/vacancies/new" className="btn-accent !py-2 !px-3">
+                  <Link href="/hr/shifts/new" className="btn-accent !py-2 !px-3">
                     <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Вакансия</span>
+                    <span className="hidden sm:inline">Смена</span>
                   </Link>
                 </>
               )}
@@ -58,7 +58,7 @@ export default async function RootLayout({
               ) : (
                 <>
                   <Link href="/login?role=HR" className="btn-ghost !py-2 hidden sm:inline-flex">
-                    Опубликовать вакансию
+                    Опубликовать смену
                   </Link>
                   <Link href="/login" className="btn-primary !py-2 text-sm">Войти</Link>
                 </>

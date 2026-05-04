@@ -1,16 +1,17 @@
 import Link from "next/link";
 import {
   ArrowRight, Building2, UserRound, Clock, ShieldCheck, Sparkles,
-  MapPin, Users, Wallet,
+  MapPin, Wallet, Calendar, Users,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { shiftLabel, formatRub } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const previewVacancies = await prisma.vacancy.findMany({
-    where: { status: "OPEN" },
-    orderBy: { createdAt: "desc" },
+  const previewShifts = await prisma.shift.findMany({
+    where: { status: "OPEN", shiftEnd: { gte: new Date() } },
+    orderBy: { shiftStart: "asc" },
     include: { position: true, hr: { include: { hrProfile: true } } },
     take: 6,
   });
@@ -22,36 +23,36 @@ export default async function Home() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-ink-200 text-xs font-medium text-ink-700 mb-6">
             <Sparkles className="w-3.5 h-3.5 text-accent-500" />
-            Найм за час, а не за неделю
+            Найм на смену за минуты
           </div>
           <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-ink-900 mb-5 leading-[1.05]">
-            Линейный персонал<br />
-            <span className="text-ink-500">для вашего отеля</span>
+            Смены и подработка<br />
+            <span className="text-ink-500">в отелях и ресторанах</span>
           </h1>
           <p className="text-lg text-ink-600 max-w-xl mx-auto mb-10">
-            Современная платформа для отелей, кафе и ресторанов: публикуйте смены и постоянку,
-            нанимайте проверенных сотрудников в один клик.
+            Uber для HoReCa-найма: HR публикует смену, кандидаты берут её в один клик.
+            Закрытие позиции — за час.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/login?role=HR" className="btn-primary !px-6 !py-3 text-base">
-              Я ищу сотрудников
+              Опубликовать смену
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link href="/feed" className="btn-secondary !px-6 !py-3 text-base">
-              Смотреть вакансии
+              Найти подработку
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Vacancies preview */}
-      {previewVacancies.length > 0 && (
+      {/* Shifts preview */}
+      {previewShifts.length > 0 && (
         <section>
           <div className="flex items-end justify-between mb-6 flex-wrap gap-3">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-1">Свежие вакансии</h2>
-              <p className="text-sm text-ink-500">Открытые позиции в HoReCa, которые ждут кандидатов</p>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-1">Свежие смены</h2>
+              <p className="text-sm text-ink-500">Открытые позиции, которые ждут кандидатов прямо сейчас</p>
             </div>
             <Link href="/feed" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-900 hover:gap-2.5 transition-all">
               Смотреть все
@@ -60,34 +61,33 @@ export default async function Home() {
           </div>
 
           <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {previewVacancies.map((v) => {
-              const slotsLeft = v.headcount - v.hiredCount;
+            {previewShifts.map((s) => {
+              const slotsLeft = s.headcount - s.hiredCount;
               return (
-                <li key={v.id}>
-                  <Link href={`/vacancy/${v.id}`} className="card-interactive block h-full">
+                <li key={s.id}>
+                  <Link href={`/shift/${s.id}`} className="card-interactive block h-full cursor-pointer">
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <span className="badge-neutral">{v.position.name}</span>
-                      <span className="badge-warning">
-                        <Users className="w-3 h-3" />
-                        {slotsLeft}
-                      </span>
+                      <span className="badge-neutral">{s.position.name}</span>
+                      <span className="badge-warning"><Users className="w-3 h-3" /> {slotsLeft}</span>
                     </div>
-                    <h3 className="font-semibold text-ink-900 leading-snug mb-3 line-clamp-2">{v.title}</h3>
+                    <h3 className="font-semibold text-ink-900 leading-snug mb-3 line-clamp-2">{s.title}</h3>
                     <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-2 text-ink-700">
+                      <div className="flex items-center gap-2 text-ink-900 font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-accent-500 shrink-0" />
+                        {shiftLabel(s.shiftStart, s.shiftEnd)}
+                      </div>
+                      <div className="flex items-center gap-2 text-ink-900 font-semibold">
+                        <Wallet className="w-3.5 h-3.5 text-accent-500 shrink-0" />
+                        {formatRub(s.payment)} ₽
+                      </div>
+                      <div className="flex items-center gap-2 text-ink-700 pt-1">
                         <Building2 className="w-3.5 h-3.5 text-ink-400 shrink-0" />
-                        <span className="truncate">{v.hr.hrProfile?.hotelName}</span>
+                        <span className="truncate">{s.hr.hrProfile?.hotelName}</span>
                       </div>
                       <div className="flex items-center gap-2 text-ink-500">
                         <MapPin className="w-3.5 h-3.5 text-ink-400 shrink-0" />
-                        <span className="truncate">{v.address}</span>
+                        <span className="truncate">{s.address}</span>
                       </div>
-                      {v.salary && (
-                        <div className="flex items-center gap-2 text-ink-900 font-medium pt-1">
-                          <Wallet className="w-3.5 h-3.5 text-accent-500 shrink-0" />
-                          {v.salary}
-                        </div>
-                      )}
                     </div>
                   </Link>
                 </li>
@@ -97,7 +97,6 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Role cards */}
       <section className="grid sm:grid-cols-2 gap-5">
         <RoleCard
           href="/login?role=HR"
@@ -105,42 +104,41 @@ export default async function Home() {
           title="Работодателю"
           subtitle="Отели, рестораны, кофейни"
           bullets={[
-            "Опубликуйте вакансию с числом мест",
-            "Получайте отклики с документами",
-            "Нанимайте одной кнопкой",
+            "Опубликуйте смену с датой и ценой",
+            "Получайте заявки с документами",
+            "Подтверждайте одной кнопкой",
           ]}
-          cta="Опубликовать вакансию"
+          cta="Опубликовать смену"
         />
         <RoleCard
           href="/login?role=WORKER"
           icon={<UserRound className="w-6 h-6" />}
           title="Соискателю"
-          subtitle="Горничные, бариста, официанты"
+          subtitle="Подработка и постоянка"
           bullets={[
             "Заполните профиль один раз",
-            "Откликайтесь в один клик",
-            "Узнавайте о найме сразу",
+            "Берите смены в один клик",
+            "Узнавайте о подтверждении сразу",
           ]}
-          cta="Найти работу"
+          cta="Найти смену"
         />
       </section>
 
-      {/* Value props */}
       <section className="grid sm:grid-cols-3 gap-5">
         <Feature
           icon={<Clock className="w-5 h-5 text-accent-500" />}
           title="Минуты, не недели"
-          text="HR видит документы и контакты в отклике — нанимает одной кнопкой."
+          text="HR видит документы и контакты в заявке — подтверждает одной кнопкой."
         />
         <Feature
           icon={<ShieldCheck className="w-5 h-5 text-accent-500" />}
           title="Только HoReCa"
-          text="Справочник позиций, понятный отрасли: бариста, рунер, хостес, повар — без шума."
+          text="Справочник позиций, понятный отрасли: бариста, рунер, хостес, повар."
         />
         <Feature
           icon={<Sparkles className="w-5 h-5 text-accent-500" />}
-          title="Просто и честно"
-          text="Контакты обеих сторон сразу. Закрылась вакансия — отклик мягко завершается."
+          title="Прозрачно"
+          text="Оплата за смену, точные даты и время. Контакты сразу после заявки."
         />
       </section>
     </div>
@@ -151,7 +149,7 @@ function RoleCard({
   href, icon, title, subtitle, bullets, cta,
 }: { href: string; icon: React.ReactNode; title: string; subtitle: string; bullets: string[]; cta: string }) {
   return (
-    <Link href={href} className="card-interactive group flex flex-col">
+    <Link href={href} className="card-interactive group flex flex-col cursor-pointer">
       <div className="flex items-center gap-3 mb-1">
         <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-ink-900 text-accent-400">
           {icon}

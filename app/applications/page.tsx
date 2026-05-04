@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, MapPin, Newspaper } from "lucide-react";
+import { Building2, Calendar, Wallet, Newspaper } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { shiftLabel, formatRub } from "@/lib/datetime";
 
 const STATUS_CLASS: Record<string, string> = {
   PENDING: "badge-warning",
@@ -11,8 +12,8 @@ const STATUS_CLASS: Record<string, string> = {
 };
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "На рассмотрении",
-  HIRED: "Нанят",
-  REJECTED: "Отклонён",
+  HIRED: "Подтверждено",
+  REJECTED: "Отклонено",
 };
 
 export default async function ApplicationsPage() {
@@ -24,7 +25,7 @@ export default async function ApplicationsPage() {
     where: { workerId: user.id },
     orderBy: { createdAt: "desc" },
     include: {
-      vacancy: {
+      shift: {
         include: { position: true, hr: { include: { hrProfile: true } } },
       },
     },
@@ -33,8 +34,8 @@ export default async function ApplicationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-1">Мои отклики</h1>
-        <p className="text-ink-500 text-sm">{apps.length} {plural(apps.length, "отклик", "отклика", "откликов")}</p>
+        <h1 className="text-3xl font-bold mb-1">Мои заявки</h1>
+        <p className="text-ink-500 text-sm">{apps.length} {plural(apps.length, "заявка", "заявки", "заявок")}</p>
       </div>
 
       {apps.length === 0 ? (
@@ -42,34 +43,38 @@ export default async function ApplicationsPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-ink-100 text-ink-500 mb-3">
             <Newspaper className="w-6 h-6" />
           </div>
-          <p className="text-ink-600 mb-4">Откликов пока нет</p>
+          <p className="text-ink-600 mb-4">Заявок пока нет</p>
           <Link href="/feed" className="btn-primary">Открыть ленту</Link>
         </div>
       ) : (
         <ul className="space-y-3">
           {apps.map((a) => {
-            const isClosed = a.vacancy.status === "CLOSED";
+            const isClosed = a.shift.status === "CLOSED";
             const showLabel =
-              a.status === "PENDING" && isClosed ? "Вакансия закрыта" : STATUS_LABEL[a.status];
+              a.status === "PENDING" && isClosed ? "Смена закрыта" : STATUS_LABEL[a.status];
             const showClass =
               a.status === "PENDING" && isClosed ? "badge-muted" : STATUS_CLASS[a.status];
             return (
               <li key={a.id}>
-                <Link href={`/vacancy/${a.vacancy.id}`} className="card-interactive block">
+                <Link href={`/shift/${a.shift.id}`} className="card-interactive block cursor-pointer">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="badge-neutral">{a.vacancy.position.name}</span>
+                        <span className="badge-neutral">{a.shift.position.name}</span>
                       </div>
-                      <h3 className="font-semibold text-ink-900 mb-1.5">{a.vacancy.title}</h3>
+                      <h3 className="font-semibold text-ink-900 mb-2">{a.shift.title}</h3>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                        <span className="inline-flex items-center gap-1.5 text-ink-900 font-medium">
+                          <Calendar className="w-3.5 h-3.5 text-accent-500" />
+                          {shiftLabel(a.shift.shiftStart, a.shift.shiftEnd)}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 text-ink-900 font-medium">
+                          <Wallet className="w-3.5 h-3.5 text-accent-500" />
+                          {formatRub(a.shift.payment)} ₽
+                        </span>
                         <span className="inline-flex items-center gap-1.5 text-ink-700">
                           <Building2 className="w-3.5 h-3.5 text-ink-400" />
-                          {a.vacancy.hr.hrProfile?.hotelName}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 text-ink-500">
-                          <MapPin className="w-3.5 h-3.5 text-ink-400" />
-                          {a.vacancy.address}
+                          {a.shift.hr.hrProfile?.hotelName}
                         </span>
                       </div>
                     </div>
