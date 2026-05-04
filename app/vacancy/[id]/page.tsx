@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, MapPin, Users, Wallet, Building2, Phone, Mail, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { applyToVacancy } from "./actions";
@@ -22,79 +23,145 @@ export default async function VacancyPage({ params }: { params: { id: string } }
   const isClosed = vacancy.status === "CLOSED";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
-      <Link href="/feed" className="text-sm text-gray-500 hover:text-gray-900">← К ленте</Link>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <Link href="/feed" className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900">
+        <ArrowLeft className="w-4 h-4" /> К ленте
+      </Link>
 
-      <div className="card">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <h1 className="text-2xl font-semibold">{vacancy.title}</h1>
-          {isClosed ? (
-            <span className="text-xs px-2 py-0.5 bg-gray-200 rounded">Вакансия закрыта</span>
-          ) : (
-            <span className="text-xs px-2 py-0.5 bg-brand-50 text-brand-700 rounded">{slotsLeft} мест</span>
-          )}
-        </div>
-        <div className="text-sm text-gray-600 mb-4">
-          {vacancy.position.name} · {vacancy.hr.hrProfile?.hotelName}
+      <article className="card">
+        <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+          <div className="flex flex-wrap gap-2">
+            <span className="badge-neutral">{vacancy.position.name}</span>
+            {isClosed ? (
+              <span className="badge-muted">Вакансия закрыта</span>
+            ) : (
+              <span className="badge-warning">
+                <Users className="w-3 h-3" />
+                {slotsLeft} {slotsLeft === 1 ? "место" : "мест"}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-3 text-sm">
+        <h1 className="text-3xl font-bold text-ink-900 leading-tight mb-2">{vacancy.title}</h1>
+        <div className="flex items-center gap-2 text-ink-600 mb-6">
+          <Building2 className="w-4 h-4 text-ink-400" />
+          {vacancy.hr.hrProfile?.hotelName}
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3 mb-6">
           {vacancy.salary && (
-            <div><span className="text-gray-500">Зарплата:</span> <b>{vacancy.salary}</b></div>
+            <InfoRow icon={<Wallet className="w-4 h-4 text-accent-500" />} label="Зарплата" value={vacancy.salary} bold />
           )}
-          <div><span className="text-gray-500">Адрес:</span> {vacancy.address}</div>
+          <InfoRow icon={<MapPin className="w-4 h-4 text-ink-400" />} label="Адрес" value={vacancy.address} />
         </div>
 
-        <div className="prose prose-sm max-w-none mt-4 whitespace-pre-wrap">
-          {vacancy.description}
+        <div className="border-t border-ink-200/70 pt-6">
+          <h2 className="section-title mb-3">Описание</h2>
+          <div className="prose prose-sm max-w-none whitespace-pre-wrap text-ink-700 leading-relaxed">
+            {vacancy.description}
+          </div>
         </div>
-      </div>
+      </article>
 
       {myApp ? (
-        <div className="card">
-          {myApp.status === "PENDING" && !isClosed && (
-            <div className="text-sm">
-              <div className="font-medium mb-1">Вы откликнулись</div>
-              <div className="text-gray-600">Ждите ответа работодателя. Контакты:</div>
-              <div className="mt-2">
-                📞 {vacancy.hr.phone} · ✉️ {vacancy.hr.email}
-              </div>
-            </div>
-          )}
-          {myApp.status === "PENDING" && isClosed && (
-            <div className="text-sm text-gray-600">
-              Вакансия закрыта — все места набраны. Попробуйте другие предложения в <Link href="/feed" className="text-brand-600">ленте</Link>.
-            </div>
-          )}
-          {myApp.status === "HIRED" && (
-            <div className="text-sm">
-              <div className="font-medium text-green-700 mb-1">Вы наняты! 🎉</div>
-              <div className="text-gray-600">Свяжитесь с работодателем:</div>
-              <div className="mt-2">
-                📞 {vacancy.hr.phone} · ✉️ {vacancy.hr.email}
-              </div>
-            </div>
-          )}
-          {myApp.status === "REJECTED" && (
-            <div className="text-sm text-gray-600">К сожалению, работодатель отклонил ваш отклик.</div>
-          )}
-        </div>
+        <ApplicationStatus app={myApp} vacancy={vacancy} isClosed={isClosed} />
       ) : !user ? (
-        <Link href={`/login?role=WORKER`} className="btn-primary block text-center">
+        <Link href={`/login?role=WORKER`} className="btn-primary w-full !py-3 text-base">
           Войти и откликнуться
         </Link>
       ) : user.role !== "WORKER" ? (
-        <div className="card text-sm text-gray-500">
-          Откликаться могут только соискатели.
+        <div className="card text-sm text-ink-500 text-center">
+          Откликаться могут только соискатели
         </div>
       ) : isClosed ? (
-        <div className="card text-sm text-gray-500">Вакансия закрыта</div>
+        <div className="card text-sm text-ink-500 text-center">Вакансия закрыта</div>
       ) : (
         <form action={applyToVacancy}>
           <input type="hidden" name="vacancyId" value={vacancy.id} />
-          <button className="btn-primary w-full">Откликнуться</button>
+          <button className="btn-accent w-full !py-3.5 text-base">Откликнуться</button>
         </form>
       )}
+    </div>
+  );
+}
+
+function InfoRow({ icon, label, value, bold }: { icon: React.ReactNode; label: string; value: string; bold?: boolean }) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-ink-50/70">
+      <div className="mt-0.5">{icon}</div>
+      <div>
+        <div className="text-xs text-ink-500">{label}</div>
+        <div className={`text-sm ${bold ? "font-semibold text-ink-900" : "text-ink-800"}`}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function ApplicationStatus({ app, vacancy, isClosed }: { app: { status: string }; vacancy: any; isClosed: boolean }) {
+  if (app.status === "HIRED") {
+    return (
+      <div className="card border-emerald-200 bg-emerald-50/50">
+        <div className="flex items-start gap-3">
+          <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500 text-white shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-semibold text-emerald-900">Вы наняты!</div>
+            <p className="text-sm text-emerald-800 mt-1">Свяжитесь с работодателем для оформления.</p>
+            <ContactBlock hr={vacancy.hr} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (app.status === "REJECTED") {
+    return (
+      <div className="card text-center">
+        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-ink-100 text-ink-500 mb-2">
+          <XCircle className="w-5 h-5" />
+        </div>
+        <p className="text-sm text-ink-600">Работодатель отклонил ваш отклик</p>
+      </div>
+    );
+  }
+  // PENDING
+  if (isClosed) {
+    return (
+      <div className="card text-center">
+        <p className="text-sm text-ink-600">
+          Вакансия закрыта — все места набраны. <Link href="/feed" className="text-ink-900 font-medium underline">Открыть ленту</Link>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="card">
+      <div className="flex items-start gap-3">
+        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-accent-100 text-accent-700 shrink-0">
+          <Clock className="w-5 h-5" />
+        </div>
+        <div>
+          <div className="font-semibold">Вы откликнулись</div>
+          <p className="text-sm text-ink-600 mt-1">Ждите ответа работодателя. Контакты для связи:</p>
+          <ContactBlock hr={vacancy.hr} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactBlock({ hr }: { hr: { phone: string | null; email: string } }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-3 text-sm">
+      {hr.phone && (
+        <a href={`tel:${hr.phone}`} className="inline-flex items-center gap-1.5 text-ink-900 hover:text-ink-700">
+          <Phone className="w-4 h-4 text-ink-400" /> {hr.phone}
+        </a>
+      )}
+      <a href={`mailto:${hr.email}`} className="inline-flex items-center gap-1.5 text-ink-900 hover:text-ink-700">
+        <Mail className="w-4 h-4 text-ink-400" /> {hr.email}
+      </a>
     </div>
   );
 }
