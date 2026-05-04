@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
-import { LogOut, LayoutDashboard, Plus, ListChecks, User, Newspaper } from "lucide-react";
+import { LogOut, LayoutDashboard, Plus, ListChecks, User, Newspaper, Users } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 
 const inter = Inter({
@@ -43,6 +43,7 @@ export default async function RootLayout({
               {user?.role === "HR" && (
                 <>
                   <NavLink href="/hr" icon={<LayoutDashboard className="w-4 h-4" />} label="Дашборд" />
+                  <NavLink href="/workers" icon={<Users className="w-4 h-4" />} label="Соискатели" />
                   <Link href="/hr/shifts/new" className="btn-accent !py-2 !px-3">
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline">Смена</span>

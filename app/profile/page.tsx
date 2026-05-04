@@ -52,6 +52,16 @@ export default async function ProfilePage() {
             <label className="label">О себе</label>
             <textarea name="about" className="input min-h-[90px]" defaultValue={user.workerProfile?.about ?? ""} placeholder="Опыт, языки, что важно..." />
           </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Мин. ставка ₽ за смену</label>
+              <input name="minPayment" type="number" min={0} step={100} className="input" defaultValue={user.workerProfile?.minPayment ?? ""} placeholder="4000" />
+            </div>
+            <div>
+              <label className="label">Когда свободен</label>
+              <input name="availabilityNote" className="input" defaultValue={user.workerProfile?.availabilityNote ?? ""} placeholder="будни вечер, выходные днём" />
+            </div>
+          </div>
           <div>
             <label className="label">На каких позициях работаете</label>
             <div className="grid sm:grid-cols-2 gap-2">

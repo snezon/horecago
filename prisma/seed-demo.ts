@@ -17,13 +17,13 @@ const HOTELS = [
 ];
 
 const WORKERS = [
-  { email: `w1@${DEMO_DOMAIN}`, name: "Анна Петрова",      phone: "+7 916 100-01-01", address: "м. Маяковская",   about: "5 лет опыта в гостиницах 4*. Аккуратная, могу выходить в любые смены.", positions: ["Горничная", "Ресепшн/Администратор"] },
-  { email: `w2@${DEMO_DOMAIN}`, name: "Михаил Иванов",     phone: "+7 916 100-02-02", address: "м. Курская",      about: "Шеф-повар с опытом 8 лет. Холодный/горячий цех. Готов на разовые смены.",   positions: ["Повар (линейный)"] },
-  { email: `w3@${DEMO_DOMAIN}`, name: "Елена Соколова",    phone: "+7 916 100-03-03", address: "м. Чистые пруды", about: "Бариста, обучение SCA. Английский B1. Свободна по утрам.",   positions: ["Бариста", "Бармен"] },
-  { email: `w4@${DEMO_DOMAIN}`, name: "Дмитрий Волков",    phone: "+7 916 100-04-04", address: "м. Парк культуры",about: "Официант 3 года, рестораны a la carte. Беру вечерние смены.",        positions: ["Официант", "Рунер"] },
-  { email: `w5@${DEMO_DOMAIN}`, name: "Ольга Кузнецова",   phone: "+7 916 100-05-05", address: "м. Полянка",      about: "Опыт ресепшн 2 года, английский B2. Готова на ночные смены.",         positions: ["Хостес", "Ресепшн/Администратор"] },
-  { email: `w6@${DEMO_DOMAIN}`, name: "Андрей Морозов",    phone: "+7 916 100-06-06", address: "м. Сокол",         about: "Повар горячего цеха, 4 года. Любые смены.",    positions: ["Повар (линейный)", "Кухонный работник"] },
-  { email: `w7@${DEMO_DOMAIN}`, name: "Виктория Новикова", phone: "+7 916 100-07-07", address: "м. Таганская",    about: "Активная, опыт официанта 1 год + бариста 6 мес.",  positions: ["Официант", "Бариста"] },
+  { email: `w1@${DEMO_DOMAIN}`, name: "Анна Петрова",      phone: "+7 916 100-01-01", address: "м. Маяковская",   about: "5 лет опыта в гостиницах 4*. Аккуратная, могу выходить в любые смены.", positions: ["Горничная", "Ресепшн/Администратор"], minPayment: 4000, availabilityNote: "Любые смены, кроме среды" },
+  { email: `w2@${DEMO_DOMAIN}`, name: "Михаил Иванов",     phone: "+7 916 100-02-02", address: "м. Курская",      about: "Шеф-повар с опытом 8 лет. Холодный/горячий цех. Готов на разовые смены.",   positions: ["Повар (линейный)"],                    minPayment: 5500, availabilityNote: "Будни, вечер" },
+  { email: `w3@${DEMO_DOMAIN}`, name: "Елена Соколова",    phone: "+7 916 100-03-03", address: "м. Чистые пруды", about: "Бариста, обучение SCA. Английский B1. Свободна по утрам.",   positions: ["Бариста", "Бармен"],                              minPayment: 3800, availabilityNote: "Утро, будни 7-15" },
+  { email: `w4@${DEMO_DOMAIN}`, name: "Дмитрий Волков",    phone: "+7 916 100-04-04", address: "м. Парк культуры",about: "Официант 3 года, рестораны a la carte. Беру вечерние смены.",        positions: ["Официант", "Рунер"],                                minPayment: 3500, availabilityNote: "Вечера, выходные" },
+  { email: `w5@${DEMO_DOMAIN}`, name: "Ольга Кузнецова",   phone: "+7 916 100-05-05", address: "м. Полянка",      about: "Опыт ресепшн 2 года, английский B2. Готова на ночные смены.",         positions: ["Хостес", "Ресепшн/Администратор"],                  minPayment: 5000, availabilityNote: "Ночные смены, выходные" },
+  { email: `w6@${DEMO_DOMAIN}`, name: "Андрей Морозов",    phone: "+7 916 100-06-06", address: "м. Сокол",         about: "Повар горячего цеха, 4 года. Любые смены.",    positions: ["Повар (линейный)", "Кухонный работник"],                                                  minPayment: 4500, availabilityNote: "Любые смены" },
+  { email: `w7@${DEMO_DOMAIN}`, name: "Виктория Новикова", phone: "+7 916 100-07-07", address: "м. Таганская",    about: "Активная, опыт официанта 1 год + бариста 6 мес.",  positions: ["Официант", "Бариста"],                                                            minPayment: 3500, availabilityNote: "Выходные, вечер будни" },
 ];
 
 // Helper to build a date relative to today at given hour:min
@@ -68,36 +68,32 @@ const SHIFTS: S[] = [
   { hr: 2, position: "Бариста",              title: "Бариста, утренняя смена",              description: "Эспрессо-бар, латте-арт приветствуется.",                                            payment: 4000, daysFromToday: 2, startHour: 7,  durationHours: 7, headcount: 1 },
 ];
 
-// Applications: [shiftIdx, workerIdx, status]
+// Applications: [shiftIdx, workerIdx, status, initiator?, message?]
 type AppStatus = "PENDING" | "HIRED" | "REJECTED";
-const APPS: [number, number, AppStatus][] = [
-  // Shift 0: Горничная утро (3 места) — 1 нанято, 2 в ожидании
+type Initiator = "WORKER" | "HR";
+const APPS: [number, number, AppStatus, Initiator?, string?][] = [
+  // Заявки от соискателей (initiator=WORKER)
   [0, 0, "HIRED"],
   [0, 4, "PENDING"],
   [0, 6, "PENDING"],
-  // Shift 1: Горничная день — 1 в ожидании
   [1, 0, "PENDING"],
-  // Shift 2: Ночной ресепшн — 2 в ожидании
   [2, 4, "PENDING"],
   [2, 0, "PENDING"],
-  // Shift 3: Хостел уборка — 1 в ожидании
   [3, 0, "PENDING"],
-  // Shift 4: Хостес — 1 в ожидании
   [4, 4, "PENDING"],
-  // Shift 5: Повар горячего (2 места) — оба нанято → CLOSED
   [5, 1, "HIRED"],
   [5, 5, "HIRED"],
-  // Shift 6: Помощник повара — 1 в ожидании
   [6, 5, "PENDING"],
-  // Shift 7: Официант ужин (3 места) — 2 в ожидании, 1 отклонён
   [7, 3, "PENDING"],
   [7, 6, "PENDING"],
   [7, 4, "REJECTED"],
-  // Shift 8: Официант бранч — 1 в ожидании
   [8, 3, "PENDING"],
-  // Shift 9: Бариста утро — 2 в ожидании
   [9, 2, "PENDING"],
-  [9, 6, "PENDING"],
+
+  // Приглашения от HR (initiator=HR) — HR сам инициирует через ленту соискателей
+  [9, 6, "PENDING", "HR", "Виктория, мы видели ваш опыт бариста — приглашаем на нашу утреннюю смену."],
+  [4, 0, "PENDING", "HR", "Анна, английский ваш B2 нам подходит. Возьмёте смену?"],
+  [3, 6, "HIRED",   "HR", "Виктория, можете завтра подменить?"],
 ];
 
 const DEMO_PDF = Buffer.from(
@@ -153,6 +149,8 @@ async function main() {
           create: {
             address: w.address,
             about: w.about,
+            minPayment: w.minPayment,
+            availabilityNote: w.availabilityNote,
             skills: {
               create: w.positions
                 .map((name) => positionByName.get(name))
@@ -196,9 +194,19 @@ async function main() {
 
   // 6. Applications + close shifts at headcount
   const hiredCounts = new Map<string, number>();
-  for (const [si, wi, status] of APPS) {
+  const seen = new Set<string>(); // (shiftId, workerId) уникальная пара
+  for (const [si, wi, status, initiator, message] of APPS) {
+    const key = `${shiftIds[si]}|${workerIds[wi]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     await prisma.application.create({
-      data: { shiftId: shiftIds[si], workerId: workerIds[wi], status },
+      data: {
+        shiftId: shiftIds[si],
+        workerId: workerIds[wi],
+        status,
+        initiator: initiator ?? "WORKER",
+        message: message ?? null,
+      },
     });
     if (status === "HIRED") {
       hiredCounts.set(shiftIds[si], (hiredCounts.get(shiftIds[si]) ?? 0) + 1);

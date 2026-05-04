@@ -30,12 +30,15 @@ model HRProfile {
 }
 
 model WorkerProfile {
-  userId  String   @id
-  about   String?
-  address String?
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skills  WorkerSkill[]
-  documents Document[]
+  userId           String   @id
+  about            String?
+  address          String?
+  minPayment       Int?     // мин. ставка ₽ за смену (для лентыHR)
+  availabilityNote String?  // "будни вечер, выходные днём"
+  isLookingForWork Boolean  @default(true) // показывать ли в /workers
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills           WorkerSkill[]
+  documents        Document[]
 }
 
 model Position {
@@ -92,6 +95,8 @@ model Application {
   id        String   @id @default(cuid())
   shiftId   String
   workerId  String
+  initiator String   @default("WORKER") // "WORKER" (заявка) | "HR" (приглашение)
+  message   String?  // опц. сопроводительное от HR при приглашении
   status    String   @default("PENDING") // "PENDING" | "HIRED" | "REJECTED"
   createdAt DateTime @default(now())
 
