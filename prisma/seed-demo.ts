@@ -42,59 +42,100 @@ type S = {
   position: string;
   title: string;
   description: string;
-  payment: number;       // ₽ за смену
+  payment: number;
   paymentNote?: string;
   daysFromToday: number;
   startHour: number;
   durationHours: number;
   headcount: number;
 };
+type ShiftTemplate = Omit<S, "daysFromToday">;
 
-const SHIFTS: S[] = [
-  // Гранд Отель
-  { hr: 0, position: "Горничная",            title: "Горничная, утренняя смена",            description: "Уборка номеров согласно стандартам сети. Питание + такси домой после ночной.",        payment: 4500, daysFromToday: 0, startHour: 8,  durationHours: 8, headcount: 3 },
-  { hr: 0, position: "Горничная",            title: "Горничная, дневная смена",             description: "Уборка номеров. Бельё, минибар, инвентаризация.",                                     payment: 4500, daysFromToday: 1, startHour: 12, durationHours: 8, headcount: 2 },
-  { hr: 0, position: "Ресепшн/Администратор", title: "Ночной ресепшн (английский)",         description: "Заселение/выселение, работа в Opera PMS. Английский B2 обязателен.",                  payment: 6500, paymentNote: "+ чай", daysFromToday: 2, startHour: 22, durationHours: 10, headcount: 1 },
+const TEMPLATES: ShiftTemplate[] = [
+  // Гранд Отель Москва (hr=0) — премиум
+  { hr: 0, position: "Горничная",             title: "Горничная, утренняя смена",      description: "Уборка номеров по стандартам сети 4*. Питание + такси домой после ночной.",        payment: 4500, startHour: 8,  durationHours: 8, headcount: 3 },
+  { hr: 0, position: "Горничная",             title: "Горничная, дневная смена",        description: "Уборка номеров. Бельё, минибар, инвентаризация.",                                  payment: 4500, startHour: 12, durationHours: 8, headcount: 2 },
+  { hr: 0, position: "Ресепшн/Администратор", title: "Ночной ресепшн (английский)",     description: "Заселение/выселение, работа в Opera PMS. Английский B2 обязателен.",               payment: 6500, paymentNote: "+ чай", startHour: 22, durationHours: 10, headcount: 1 },
+  { hr: 0, position: "Хостес",                title: "Хостес в лобби (выходные)",       description: "Встреча гостей, координация с консьерж-сервисом.",                                  payment: 4800, startHour: 10, durationHours: 8, headcount: 1 },
 
-  // Hostel Beehive
-  { hr: 1, position: "Горничная",            title: "Уборка хостела, утро",                description: "Общие зоны, кухня, кровати. Дневная смена 5/2 на постоянке тоже доступна.",        payment: 3500, daysFromToday: 1, startHour: 9,  durationHours: 6, headcount: 2 },
-  { hr: 1, position: "Хостес",               title: "Дежурный администратор хостела",       description: "Заселение гостей, ответы на вопросы, контроль чистоты. Разговорный английский.",   payment: 4000, daysFromToday: 3, startHour: 14, durationHours: 8, headcount: 1 },
+  // Hostel Beehive (hr=1) — бюджет
+  { hr: 1, position: "Горничная",             title: "Уборка хостела, утро",            description: "Общие зоны, кухня, кровати. Дружный коллектив.",                                    payment: 3500, startHour: 9,  durationHours: 6, headcount: 2 },
+  { hr: 1, position: "Хостес",                title: "Дежурный администратор хостела",  description: "Заселение гостей, ответы на вопросы, контроль чистоты. Разговорный английский.",     payment: 4000, startHour: 14, durationHours: 8, headcount: 1 },
+  { hr: 1, position: "Технический персонал",  title: "Технический сотрудник, день",     description: "Мелкий ремонт, замена лампочек, доставка вещей. Без специального опыта.",          payment: 3200, startHour: 10, durationHours: 8, headcount: 1 },
 
-  // Ресторан Aria
-  { hr: 2, position: "Повар (линейный)",      title: "Повар горячего цеха, ужин",           description: "Заготовки днём, отдача вечером. Опыт от 2 лет. Питание включено.",                  payment: 5500, daysFromToday: 0, startHour: 14, durationHours: 10, headcount: 2 },
-  { hr: 2, position: "Повар (линейный)",      title: "Помощник повара, бранч",              description: "Заготовки, чистка овощей, помощь горячему цеху. Без опыта тоже рассмотрим.",        payment: 3800, daysFromToday: 2, startHour: 9,  durationHours: 8, headcount: 1 },
-  { hr: 2, position: "Официант",             title: "Официант, ужин (a la carte)",          description: "Сервис гостей по стандартам. Чаевые делятся через tronc.",                          payment: 3500, paymentNote: "+ чай (~2-4т)", daysFromToday: 1, startHour: 17, durationHours: 7, headcount: 3 },
-  { hr: 2, position: "Официант",             title: "Официант, бранч-смена",                description: "Воскресный бранч, активный поток. Английский на уровне меню.",                       payment: 4200, paymentNote: "+ чай", daysFromToday: 4, startHour: 11, durationHours: 6, headcount: 2 },
-  { hr: 2, position: "Бариста",              title: "Бариста, утренняя смена",              description: "Эспрессо-бар, латте-арт приветствуется.",                                            payment: 4000, daysFromToday: 2, startHour: 7,  durationHours: 7, headcount: 1 },
+  // Ресторан Aria (hr=2) — общепит
+  { hr: 2, position: "Повар (линейный)",      title: "Повар горячего цеха, ужин",       description: "Заготовки днём, отдача вечером. Опыт от 2 лет. Питание включено.",                  payment: 5500, startHour: 14, durationHours: 10, headcount: 2 },
+  { hr: 2, position: "Кухонный работник",     title: "Помощник повара, бранч",          description: "Заготовки, чистка овощей, помощь горячему цеху. Без опыта рассмотрим.",             payment: 3800, startHour: 9,  durationHours: 8, headcount: 1 },
+  { hr: 2, position: "Официант",              title: "Официант, ужин (a la carte)",     description: "Сервис гостей по стандартам. Чаевые делятся через tronc.",                           payment: 3500, paymentNote: "+ чай ~2-4т", startHour: 17, durationHours: 7, headcount: 3 },
+  { hr: 2, position: "Официант",              title: "Официант, бранч-смена",           description: "Воскресный бранч, активный поток. Английский на уровне меню.",                       payment: 4200, paymentNote: "+ чай", startHour: 11, durationHours: 6, headcount: 2 },
+  { hr: 2, position: "Бариста",               title: "Бариста, утренняя смена",         description: "Эспрессо-бар, латте-арт приветствуется.",                                            payment: 4000, startHour: 7,  durationHours: 7, headcount: 1 },
+  { hr: 2, position: "Бармен",                title: "Бармен, вечерний сервис",         description: "Авторские коктейли, опыт от 1 года. Чаевые щедрые.",                                 payment: 5000, paymentNote: "+ чай", startHour: 18, durationHours: 8, headcount: 1 },
+  { hr: 2, position: "Рунер",                 title: "Рунер, ужин",                     description: "Доставка блюд из кухни в зал. Без опыта — обучим.",                                  payment: 3000, paymentNote: "+ чай", startHour: 18, durationHours: 6, headcount: 2 },
 ];
 
-// Applications: [shiftIdx, workerIdx, status, initiator?, message?]
+// Распределим смены до конца июня (≈50 дней от 2026-05-11).
+// День 0 = сегодня. Каждый шаблон используется несколько раз.
+const DAY_OFFSETS: number[] = [
+  0, 1, 1, 2, 3, 3, 4, 5, 6, 7,
+  8, 9, 10, 11, 12, 13, 14, 15, 17, 18,
+  20, 21, 23, 24, 26, 28, 30, 32, 34, 36,
+  38, 41, 44, 47, 50,
+];
+
+const SHIFTS: S[] = DAY_OFFSETS.map((d, i) => ({
+  ...TEMPLATES[i % TEMPLATES.length],
+  daysFromToday: d,
+}));
+
+// Applications: автогенерация
 type AppStatus = "PENDING" | "HIRED" | "REJECTED";
 type Initiator = "WORKER" | "HR";
-const APPS: [number, number, AppStatus, Initiator?, string?][] = [
-  // Заявки от соискателей (initiator=WORKER)
-  [0, 0, "HIRED"],
-  [0, 4, "PENDING"],
-  [0, 6, "PENDING"],
-  [1, 0, "PENDING"],
-  [2, 4, "PENDING"],
-  [2, 0, "PENDING"],
-  [3, 0, "PENDING"],
-  [4, 4, "PENDING"],
-  [5, 1, "HIRED"],
-  [5, 5, "HIRED"],
-  [6, 5, "PENDING"],
-  [7, 3, "PENDING"],
-  [7, 6, "PENDING"],
-  [7, 4, "REJECTED"],
-  [8, 3, "PENDING"],
-  [9, 2, "PENDING"],
+type AppRow = [number, number, AppStatus, Initiator?, string?];
 
-  // Приглашения от HR (initiator=HR) — HR сам инициирует через ленту соискателей
-  [9, 6, "PENDING", "HR", "Виктория, мы видели ваш опыт бариста — приглашаем на нашу утреннюю смену."],
-  [4, 0, "PENDING", "HR", "Анна, английский ваш B2 нам подходит. Возьмёте смену?"],
-  [3, 6, "HIRED",   "HR", "Виктория, можете завтра подменить?"],
-];
+function buildApps(): AppRow[] {
+  const apps: AppRow[] = [];
+  // Прошлые/ближайшие смены — больше активности, заполненность найма
+  // Дальние — несколько pending заявок
+  SHIFTS.forEach((s, si) => {
+    if (s.daysFromToday > 14) {
+      // дальние: 1 pending worker
+      const wi = (si * 3 + 1) % 7;
+      apps.push([si, wi, "PENDING"]);
+      return;
+    }
+    if (s.daysFromToday < 3) {
+      // ближайшие: 2-3 заявки, часть нанято
+      const wi1 = (si * 2) % 7;
+      const wi2 = (si * 2 + 3) % 7;
+      const wi3 = (si * 2 + 5) % 7;
+      // 1 нанят (если это покрывает headcount)
+      apps.push([si, wi1, "HIRED"]);
+      apps.push([si, wi2, "PENDING"]);
+      if (si % 3 === 0) apps.push([si, wi3, "PENDING"]);
+      return;
+    }
+    // ближайшие 3-14 дней: 1-2 pending
+    const wi1 = (si * 2) % 7;
+    const wi2 = (si * 2 + 4) % 7;
+    apps.push([si, wi1, "PENDING"]);
+    if (si % 2 === 0) apps.push([si, wi2, "PENDING"]);
+  });
+
+  // Несколько приглашений от HR (initiator=HR)
+  const invites: AppRow[] = [
+    [4,  5, "PENDING", "HR", "Андрей, у нас открыта смена в Beehive, подойдёте?"],
+    [9,  2, "PENDING", "HR", "Елена, бариста-смена ждёт. Сможете?"],
+    [12, 6, "PENDING", "HR", "Виктория, есть для вас бариста-смена через неделю."],
+    [15, 0, "PENDING", "HR", "Анна, есть смена горничной. Готовы?"],
+    [20, 3, "HIRED",   "HR", "Дмитрий, спасибо, подтверждаем!"],
+  ];
+  for (const inv of invites) {
+    if (inv[0] < SHIFTS.length) apps.push(inv);
+  }
+  return apps;
+}
+
+const APPS: AppRow[] = buildApps();
 
 const DEMO_PDF = Buffer.from(
   "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 47>>stream\nBT /F1 24 Tf 100 700 Td (Demo document) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000054 00000 n \n0000000098 00000 n \n0000000182 00000 n \n0000000277 00000 n \ntrailer<</Size 6/Root 1 0 R>>startxref\n339\n%%EOF",
