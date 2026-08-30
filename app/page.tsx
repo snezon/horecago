@@ -31,7 +31,7 @@ export default async function Home() {
           </h1>
           <p className="text-lg text-ink-600 max-w-xl mx-auto mb-10">
             Uber для HoReCa-найма: HR публикует смену, кандидаты берут её в один клик.
-            Закрытие позиции — за час.
+            Закрытие смены — около 30 минут.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
