@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isAdmin } from "@/lib/domain/access";
 import { setOrgVerified } from "./actions";
@@ -10,7 +10,8 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default async function AdminOrgsPage() {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
   if (!isAdmin(user.email)) redirect("/");
 
   const orgs = await prisma.org.findMany({
