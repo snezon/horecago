@@ -168,7 +168,7 @@ model AgencyInvite {
   id             String    @id @default(cuid())
   agencyId       String
   email          String
-  status         String    @default("PENDING") // "PENDING" | "ACCEPTED" | "CANCELLED"
+  status         String    @default("PENDING") // "PENDING" | "ACCEPTED" | "CANCELLED" | "EXPIRED"
   deliveryStatus String    @default("SENT")    // "SENT" | "FAILED"
   deliveryError  String?
   createdAt      DateTime  @default(now())

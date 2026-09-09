@@ -19,11 +19,32 @@ export const INVITE_MAX_AGE_DAYS = 60;
 export async function inviteWorker(agencyId: string, email: string) {
   const normalized = email.toLowerCase().trim();
 
-  const invite = await prisma.agencyInvite.upsert({
+  const existing = await prisma.agencyInvite.findUnique({
     where: { agencyId_email: { agencyId, email: normalized } },
-    update: {},
-    create: { agencyId, email: normalized, status: "PENDING" },
   });
+
+  let invite;
+  if (!existing) {
+    invite = await prisma.agencyInvite.create({
+      data: { agencyId, email: normalized, status: "PENDING" },
+    });
+  } else if (existing.status === "ACCEPTED") {
+    // Приглашение уже принято — человек привязан к агентству по этому
+    // приглашению, и это часть истории. Повторное приглашение на тот же
+    // адрес не должно её переписывать: ни статус, ни дату, ни отметку
+    // о доставке не трогаем.
+    invite = existing;
+  } else {
+    // PENDING/CANCELLED/EXPIRED — агентство зовёт заново, это новый цикл
+    // приглашения, а не продолжение старого: статус возвращаем в PENDING и
+    // обновляем createdAt на сейчас. Без этого acceptPendingInvites искал
+    // бы только PENDING (CANCELLED так и останется отменённым) или отсчитал
+    // бы 60-дневный срок от старой даты и тут же пометил EXPIRED заново.
+    invite = await prisma.agencyInvite.update({
+      where: { id: existing.id },
+      data: { status: "PENDING", createdAt: new Date(), deliveryError: null },
+    });
+  }
 
   const { url, token, delivery } = await createMagicLink(
     normalized,
@@ -32,13 +53,15 @@ export async function inviteWorker(agencyId: string, email: string) {
     INVITE_TTL_MIN,
   );
 
-  await prisma.agencyInvite.update({
-    where: { id: invite.id },
-    data: {
-      deliveryStatus: delivery.ok ? "SENT" : "FAILED",
-      deliveryError: delivery.ok ? null : (delivery.error ?? "неизвестная ошибка"),
-    },
-  });
+  if (invite.status !== "ACCEPTED") {
+    await prisma.agencyInvite.update({
+      where: { id: invite.id },
+      data: {
+        deliveryStatus: delivery.ok ? "SENT" : "FAILED",
+        deliveryError: delivery.ok ? null : (delivery.error ?? "неизвестная ошибка"),
+      },
+    });
+  }
 
   // Если человек уже зарегистрирован — представительство заводим сразу,
   // но в статусе PENDING: подтвердит он сам, перейдя по ссылке или войдя

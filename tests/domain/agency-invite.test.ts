@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
 import { createOrg } from "@/lib/domain/orgs";
 import {
@@ -35,6 +35,72 @@ describe("inviteWorker", () => {
     await inviteWorker(agency.id, "dup@example.com");
 
     expect(await prisma.agencyInvite.count()).toBe(1);
+  });
+});
+
+describe("inviteWorker: повторное приглашение существующей записи", () => {
+  beforeEach(resetDb);
+
+  it("возвращает отменённое (CANCELLED) приглашение в PENDING, и после входа работник привязывается", async () => {
+    const agency = await makeAgency("Кадры15");
+    await prisma.agencyInvite.create({
+      data: { agencyId: agency.id, email: "cancelled@example.com", status: "CANCELLED" },
+    });
+
+    await inviteWorker(agency.id, "cancelled@example.com");
+
+    const invite = await prisma.agencyInvite.findFirst();
+    expect(invite?.status).toBe("PENDING");
+
+    const user = await prisma.user.create({
+      data: { email: "cancelled@example.com", role: "WORKER" },
+    });
+    const accepted = await acceptPendingInvites(user.id, "cancelled@example.com");
+    expect(accepted).toBe(1);
+  });
+
+  it("обновляет дату просроченного (EXPIRED) приглашения, и после входа работник привязывается", async () => {
+    const agency = await makeAgency("Кадры16");
+    const staleCreatedAt = new Date(Date.now() - 61 * 24 * 60 * 60 * 1000);
+    await prisma.agencyInvite.create({
+      data: {
+        agencyId: agency.id,
+        email: "expired@example.com",
+        status: "EXPIRED",
+        createdAt: staleCreatedAt,
+      },
+    });
+
+    await inviteWorker(agency.id, "expired@example.com");
+
+    const invite = await prisma.agencyInvite.findFirst();
+    expect(invite?.status).toBe("PENDING");
+    expect(invite?.createdAt.getTime()).toBeGreaterThan(staleCreatedAt.getTime());
+
+    const user = await prisma.user.create({
+      data: { email: "expired@example.com", role: "WORKER" },
+    });
+    const accepted = await acceptPendingInvites(user.id, "expired@example.com");
+    expect(accepted).toBe(1);
+  });
+
+  it("не меняет статус уже принятого (ACCEPTED) приглашения", async () => {
+    const agency = await makeAgency("Кадры17");
+    const acceptedAt = new Date();
+    await prisma.agencyInvite.create({
+      data: {
+        agencyId: agency.id,
+        email: "accepted@example.com",
+        status: "ACCEPTED",
+        acceptedAt,
+      },
+    });
+
+    await inviteWorker(agency.id, "accepted@example.com");
+
+    const invite = await prisma.agencyInvite.findFirst();
+    expect(invite?.status).toBe("ACCEPTED");
+    expect(invite?.acceptedAt?.getTime()).toBe(acceptedAt.getTime());
   });
 });
 
@@ -138,6 +204,39 @@ describe("acceptPendingInvites", () => {
       where: { workerId_agencyId: { workerId: user.id, agencyId: agency.id } },
     });
     expect(rep?.status).toBe("ACTIVE");
+  });
+
+  it("приглашение возрастом ровно 60 дней принимается (граница)", async () => {
+    // Сравнение в acceptPendingInvites строгое ("<"), т.е. ровно 60 дней —
+    // ещё не просрочено. Проверить это без флейка (между setup и вызовом
+    // проходит реальное время) можно только зафиксировав часы: иначе
+    // createdAt всегда окажется на несколько мс "старше" cutoff.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const agency = await makeAgency("Кадры8");
+      const user = await prisma.user.create({
+        data: { email: "boundary@example.com", role: "WORKER" },
+      });
+      const createdAt = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+      await prisma.agencyInvite.create({
+        data: {
+          agencyId: agency.id,
+          email: "boundary@example.com",
+          status: "PENDING",
+          createdAt,
+        },
+      });
+
+      const accepted = await acceptPendingInvites(user.id, "boundary@example.com");
+
+      expect(accepted).toBe(1);
+      const rep = await prisma.representation.findUnique({
+        where: { workerId_agencyId: { workerId: user.id, agencyId: agency.id } },
+      });
+      expect(rep?.status).toBe("ACTIVE");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
