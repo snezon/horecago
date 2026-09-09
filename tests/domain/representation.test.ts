@@ -58,6 +58,23 @@ describe("inviteWorker", () => {
     });
     expect(rep?.status).toBe("PENDING");
   });
+
+  it("повторное приглашение не сбрасывает подтверждённое представительство", async () => {
+    const agency = await makeAgency("Кадры8");
+    const worker = await makeWorker("confirmed@example.com");
+    await activateRepresentation(worker.id, agency.id);
+
+    await inviteWorker(agency.id, "confirmed@example.com");
+
+    const rep = await prisma.representation.findUnique({
+      where: {
+        workerId_agencyId: { workerId: worker.id, agencyId: agency.id },
+      },
+    });
+    expect(rep?.status).toBe("ACTIVE");
+    expect(rep?.activatedAt).toBeInstanceOf(Date);
+    expect(await prisma.representation.count()).toBe(1);
+  });
 });
 
 describe("activateRepresentation", () => {
