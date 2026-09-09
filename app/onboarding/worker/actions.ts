@@ -3,14 +3,17 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { recordConsent } from "@/lib/domain/consent";
+import { hasConsent, needsConsentCheckbox, recordConsent } from "@/lib/domain/consent";
 
 export async function saveWorkerOnboarding(formData: FormData) {
   const user = await requireUser();
   if (user.role !== "WORKER") redirect("/");
 
-  const consent = formData.get("consent");
-  if (!consent) redirect("/onboarding/worker?error=consent");
+  const consentTicked = Boolean(formData.get("consent"));
+  const alreadyConsented = await hasConsent(user.id);
+  if (needsConsentCheckbox(alreadyConsented, consentTicked)) {
+    redirect("/onboarding/worker?error=consent");
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
@@ -34,7 +37,9 @@ export async function saveWorkerOnboarding(formData: FormData) {
     });
   }
 
-  await recordConsent(user.id);
+  if (consentTicked) {
+    await recordConsent(user.id);
+  }
 
   redirect("/feed");
 }

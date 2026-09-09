@@ -17,3 +17,13 @@ export async function hasConsent(userId: string) {
   });
   return user?.consentVersion === CONSENT_VERSION;
 }
+
+/**
+ * Нужно ли требовать отметку чекбокса на форме.
+ * Если действующее согласие уже есть — не требуем повторно.
+ * Если его нет (новый работник или согласие относится к старой версии текста) —
+ * требуем отметку.
+ */
+export function needsConsentCheckbox(hasExisting: boolean, checkboxTicked: boolean): boolean {
+  return !hasExisting && !checkboxTicked;
+}

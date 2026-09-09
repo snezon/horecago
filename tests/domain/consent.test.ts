@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
-import { recordConsent, hasConsent, CONSENT_VERSION } from "@/lib/domain/consent";
+import { recordConsent, hasConsent, needsConsentCheckbox, CONSENT_VERSION } from "@/lib/domain/consent";
 
 async function makeUser(email: string) {
   return prisma.user.create({ data: { email, role: "WORKER" } });
@@ -52,5 +52,29 @@ describe("hasConsent", () => {
       data: { consentedAt: new Date(), consentVersion: "устаревшая" },
     });
     expect(await hasConsent(user.id)).toBe(false);
+  });
+
+  it("сохранение профиля без чекбокса проходит, если действующее согласие уже есть", async () => {
+    const user = await makeUser("f@example.com");
+    await recordConsent(user.id);
+    expect(await hasConsent(user.id)).toBe(true);
+  });
+});
+
+describe("needsConsentCheckbox", () => {
+  it("новый работник без отметки — чекбокс нужен", () => {
+    expect(needsConsentCheckbox(false, false)).toBe(true);
+  });
+
+  it("новый работник с отметкой — чекбокс не нужен, можно сохранять", () => {
+    expect(needsConsentCheckbox(false, true)).toBe(false);
+  });
+
+  it("уже согласившийся без отметки — чекбокс не нужен, профиль сохраняется свободно", () => {
+    expect(needsConsentCheckbox(true, false)).toBe(false);
+  });
+
+  it("уже согласившийся с отметкой — чекбокс не нужен", () => {
+    expect(needsConsentCheckbox(true, true)).toBe(false);
   });
 });

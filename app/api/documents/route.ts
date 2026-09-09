@@ -4,11 +4,19 @@ import path from "path";
 import { randomBytes } from "crypto";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { hasConsent } from "@/lib/domain/consent";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user || user.role !== "WORKER") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!(await hasConsent(user.id))) {
+    return NextResponse.json(
+      { error: "Загрузка документов доступна только после согласия на обработку персональных данных" },
+      { status: 403 }
+    );
   }
 
   const form = await req.formData();

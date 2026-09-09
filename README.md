@@ -136,6 +136,7 @@ Caddy сам выпускает и продлевает Let's Encrypt серти
 - Подключён домен `horecago.tech`, ящик `noreply@horecago.tech`
 - В настройках включён «SMTP по паролю» (отдельный пароль для приложений)
 - В `.env` на проде: `SMTP_HOST=smtp.mail.ru`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=noreply@horecago.tech`, `SMTP_PASS=...`, `SMTP_FROM=noreply@horecago.tech`
+- До запуска пилота нужно настроить чтение или пересылку ящика `noreply@horecago.tech` — политика указывает его как канал обращений по персональным данным, а ящики с таким префиксом обычно никто не читает
 
 ## Деплой
 

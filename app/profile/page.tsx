@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import { FileText, Trash2, Upload, ExternalLink } from "lucide-react";
+import { FileText, Trash2, Upload, ExternalLink, Lock } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { representingAgencies } from "@/lib/domain/representation";
+import { hasConsent } from "@/lib/domain/consent";
 import { saveWorkerOnboarding } from "@/app/onboarding/worker/actions";
 import { deleteDocument, revokeMyRepresentation } from "./actions";
 
@@ -19,6 +20,7 @@ export default async function ProfilePage() {
     orderBy: { createdAt: "desc" },
   });
   const agencies = (await representingAgencies([user.id])).get(user.id) ?? [];
+  const consented = await hasConsent(user.id);
 
   const kindLabel: Record<string, string> = {
     PASSPORT: "Паспорт",
@@ -103,24 +105,37 @@ export default async function ProfilePage() {
           Паспорт и медкнижка. Работодатель увидит их сразу в отклике.
         </p>
 
-        <form action="/api/documents" method="post" encType="multipart/form-data" className="flex flex-wrap gap-3 items-end mb-6 p-4 rounded-xl bg-ink-50 border border-ink-200/70">
-          <div className="flex-1 min-w-[160px]">
-            <label className="label">Тип</label>
-            <select name="kind" className="input">
-              <option value="PASSPORT">Паспорт</option>
-              <option value="MED_BOOK">Медкнижка</option>
-              <option value="OTHER">Другое</option>
-            </select>
+        {consented ? (
+          <form action="/api/documents" method="post" encType="multipart/form-data" className="flex flex-wrap gap-3 items-end mb-6 p-4 rounded-xl bg-ink-50 border border-ink-200/70">
+            <div className="flex-1 min-w-[160px]">
+              <label className="label">Тип</label>
+              <select name="kind" className="input">
+                <option value="PASSPORT">Паспорт</option>
+                <option value="MED_BOOK">Медкнижка</option>
+                <option value="OTHER">Другое</option>
+              </select>
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <label className="label">Файл</label>
+              <input type="file" name="file" required className="input file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-ink-100 file:text-ink-700 file:text-xs" />
+            </div>
+            <button className="btn-primary">
+              <Upload className="w-4 h-4" />
+              Загрузить
+            </button>
+          </form>
+        ) : (
+          <div className="flex items-start gap-3 mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
+            <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800">
+              Чтобы загружать документы, нужно принять условия обработки
+              персональных данных.{" "}
+              <a href="/onboarding/worker" className="underline">
+                Сделать это можно здесь
+              </a>.
+            </p>
           </div>
-          <div className="flex-1 min-w-[180px]">
-            <label className="label">Файл</label>
-            <input type="file" name="file" required className="input file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-ink-100 file:text-ink-700 file:text-xs" />
-          </div>
-          <button className="btn-primary">
-            <Upload className="w-4 h-4" />
-            Загрузить
-          </button>
-        </form>
+        )}
 
         {documents.length === 0 ? (
           <p className="text-sm text-ink-500 text-center py-6">Документы не загружены</p>
