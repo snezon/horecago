@@ -87,6 +87,8 @@ export default async function AgencyDashboardPage({
   const reps = await prisma.representation.findMany({
     where: { agencyId },
     include: { worker: true },
+    orderBy: { createdAt: "desc" },
+    take: INVITES_LIMIT,
   });
   const repByEmail = new Map(reps.map((r) => [r.worker.email, r]));
 

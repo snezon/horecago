@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { hireApplication } from "@/lib/domain/hiring";
+import { hireApplication, syncShiftStatus } from "@/lib/domain/hiring";
 
 function parseLocalDate(value: FormDataEntryValue | null): Date {
   const s = String(value ?? "");
@@ -57,9 +57,12 @@ export async function updateShift(formData: FormData) {
     data: {
       title, description, payment, paymentNote, address, headcount,
       shiftStart, shiftEnd,
-      status: headcount > v.hiredCount ? "OPEN" : "CLOSED",
     },
   });
+  // Статус не вычисляем здесь по снимку v, прочитанному выше: между чтением
+  // и этой записью параллельно мог пройти найм. syncShiftStatus сам перечитает
+  // актуальный счётчик и условно обновит статус.
+  await syncShiftStatus(id);
   revalidatePath(`/hr/shifts/${id}`);
 }
 

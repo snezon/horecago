@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
-import { hireApplication } from "@/lib/domain/hiring";
+import { hireApplication, syncShiftStatus } from "@/lib/domain/hiring";
 
 async function setup(headcount: number) {
   const hr = await prisma.user.create({ data: { email: "hr@example.com", role: "HR" } });
@@ -83,5 +83,59 @@ describe("hireApplication", () => {
 
   it("несуществующий отклик", async () => {
     expect(await hireApplication("нет-такого")).toBe("NOT_FOUND");
+  });
+});
+
+describe("syncShiftStatus", () => {
+  beforeEach(resetDb);
+
+  it("смена заполнена — приведение статуса закрывает её", async () => {
+    const { shift } = await setup(1);
+    await prisma.shift.update({ where: { id: shift.id }, data: { hiredCount: 1 } });
+
+    expect(await syncShiftStatus(shift.id)).toBe("CLOSED");
+
+    const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
+    expect(fresh?.status).toBe("CLOSED");
+    expect(fresh?.hiredCount).toBe(1);
+  });
+
+  it("работодатель увеличил число мест на заполненной смене — снова открыта", async () => {
+    const { shift } = await setup(1);
+    await prisma.shift.update({
+      where: { id: shift.id },
+      data: { hiredCount: 1, status: "CLOSED" },
+    });
+    await prisma.shift.update({ where: { id: shift.id }, data: { headcount: 2 } });
+
+    expect(await syncShiftStatus(shift.id)).toBe("OPEN");
+
+    const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
+    expect(fresh?.status).toBe("OPEN");
+    expect(fresh?.hiredCount).toBe(1);
+  });
+
+  it("работодатель уменьшил число мест до уже занятого — становится закрытой", async () => {
+    const { shift } = await setup(3);
+    await prisma.shift.update({ where: { id: shift.id }, data: { hiredCount: 2 } });
+    await prisma.shift.update({ where: { id: shift.id }, data: { headcount: 2 } });
+
+    expect(await syncShiftStatus(shift.id)).toBe("CLOSED");
+
+    const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
+    expect(fresh?.status).toBe("CLOSED");
+    expect(fresh?.hiredCount).toBe(2);
+  });
+
+  it("не меняет счётчик занятых мест ни в одном из случаев", async () => {
+    const { shift } = await setup(2);
+    await prisma.shift.update({ where: { id: shift.id }, data: { hiredCount: 2 } });
+
+    await syncShiftStatus(shift.id);
+    await syncShiftStatus(shift.id); // повторный вызов — статус уже верный, ветка без записи
+
+    const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
+    expect(fresh?.hiredCount).toBe(2);
+    expect(fresh?.status).toBe("CLOSED");
   });
 });
