@@ -25,7 +25,7 @@ export async function sendEmail(
   text?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const transport = getTransport();
-  const from = process.env.SMTP_FROM ?? "noreply@horecago.ru";
+  const from = process.env.SMTP_FROM ?? "noreply@horecago.tech";
   if (!transport) {
     console.log("\n=== EMAIL (dev, no SMTP) ===");
     console.log(`From: ${from}`);

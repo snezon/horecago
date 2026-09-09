@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { inviteWorker } from "./actions";
 import { shiftLabel, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
+import { canViewWorkerDocuments } from "@/lib/domain/documents";
 import { agencyLabel, representedNotice } from "@/lib/agency-label";
 
 const kindLabel: Record<string, string> = {
@@ -61,6 +62,7 @@ export default async function WorkerPage({
 
   const skills = worker.workerProfile.skills.map((s) => s.position.name);
   const agencies = (await representingAgencies([worker.id])).get(worker.id) ?? [];
+  const canSeeDocuments = await canViewWorkerDocuments(user.id, worker.id);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -153,7 +155,7 @@ export default async function WorkerPage({
           </div>
         </div>
 
-        {worker.workerProfile.documents.length > 0 && (
+        {canSeeDocuments && worker.workerProfile.documents.length > 0 && (
           <div className="border-t border-ink-200/70 pt-4 mt-4">
             <div className="text-xs uppercase tracking-wide text-ink-500 mb-2">Документы</div>
             <ul className="flex flex-wrap gap-2">

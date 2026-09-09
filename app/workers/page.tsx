@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPin, Wallet, Calendar, FileText } from "lucide-react";
+import { MapPin, Wallet, Calendar } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatRub } from "@/lib/datetime";
@@ -33,7 +33,6 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
       workerProfile: {
         include: {
           skills: { include: { position: true } },
-          documents: true,
         },
       },
     },
@@ -65,7 +64,6 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
         <ul className="grid sm:grid-cols-2 gap-4">
           {workers.map((w) => {
             const skills = w.workerProfile?.skills.map((s) => s.position.name) ?? [];
-            const docCount = w.workerProfile?.documents.length ?? 0;
             const agencies = agencyMap.get(w.id) ?? [];
             return (
               <li key={w.id}>
@@ -112,12 +110,6 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
                       <div className="flex items-center gap-2 text-ink-700">
                         <Calendar className="w-3.5 h-3.5 text-ink-400 shrink-0" />
                         <span className="truncate">{w.workerProfile.availabilityNote}</span>
-                      </div>
-                    )}
-                    {docCount > 0 && (
-                      <div className="flex items-center gap-2 text-ink-500 text-xs">
-                        <FileText className="w-3.5 h-3.5 shrink-0" />
-                        {docCount} {plural(docCount, "документ", "документа", "документов")}
                       </div>
                     )}
                   </div>

@@ -14,6 +14,8 @@ import { parseEmailList, MAX_INVITES_PER_BATCH } from "@/lib/domain/emails";
  */
 export async function sendWorkerInvites(formData: FormData) {
   const user = await requireUser();
+  if (user.role !== "AGENCY") redirect("/");
+
   const [agencyId] = await agencyIdsOf(user.id);
   if (!agencyId) return;
 

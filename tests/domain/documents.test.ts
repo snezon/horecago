@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
 import { createOrg, addMember } from "@/lib/domain/orgs";
 import { activateRepresentation, revokeRepresentation } from "@/lib/domain/representation";
-import { canViewDocumentUrl } from "@/lib/domain/documents";
+import { canViewDocumentUrl, canViewWorkerDocuments } from "@/lib/domain/documents";
 
 const URL = "/uploads/abc123.pdf";
 
@@ -131,5 +131,63 @@ describe("canViewDocumentUrl", () => {
     await activateRepresentation(worker.id, agency.id);
     await revokeRepresentation(worker.id, agency.id);
     expect(await canViewDocumentUrl(owner.id, URL)).toBe(false);
+  });
+});
+
+describe("canViewWorkerDocuments", () => {
+  beforeEach(resetDb);
+
+  it("сам работник видит свои документы", async () => {
+    const worker = await makeWorkerWithDoc();
+    expect(await canViewWorkerDocuments(worker.id, worker.id)).toBe(true);
+  });
+
+  it("заказчик с откликом этого работника на свою смену — видит", async () => {
+    const worker = await makeWorkerWithDoc();
+    const hr = await makeHr("hr@example.com");
+    await makeShiftWithApplication(hr.id, worker.id);
+    expect(await canViewWorkerDocuments(hr.id, worker.id)).toBe(true);
+  });
+
+  it("посторонний заказчик — не видит", async () => {
+    const worker = await makeWorkerWithDoc();
+    const hr = await makeHr("hr@example.com");
+    await makeShiftWithApplication(hr.id, worker.id);
+    const stranger = await makeHr("stranger@example.com");
+    expect(await canViewWorkerDocuments(stranger.id, worker.id)).toBe(false);
+  });
+
+  it("агентство с активным представительством — видит", async () => {
+    const worker = await makeWorkerWithDoc();
+    const owner = await prisma.user.create({
+      data: { email: "owner5@example.com", role: "AGENCY" },
+    });
+    const agency = await createOrg({
+      type: "AGENCY", name: "Кадры-5", ownerUserId: owner.id,
+    });
+    await activateRepresentation(worker.id, agency.id);
+    expect(await canViewWorkerDocuments(owner.id, worker.id)).toBe(true);
+  });
+
+  it("чужое агентство — не видит", async () => {
+    const worker = await makeWorkerWithDoc();
+    const owner = await prisma.user.create({
+      data: { email: "owner6@example.com", role: "AGENCY" },
+    });
+    await createOrg({ type: "AGENCY", name: "Кадры-6", ownerUserId: owner.id });
+    expect(await canViewWorkerDocuments(owner.id, worker.id)).toBe(false);
+  });
+
+  it("отозванное представительство — не видит", async () => {
+    const worker = await makeWorkerWithDoc();
+    const owner = await prisma.user.create({
+      data: { email: "owner7@example.com", role: "AGENCY" },
+    });
+    const agency = await createOrg({
+      type: "AGENCY", name: "Кадры-7", ownerUserId: owner.id,
+    });
+    await activateRepresentation(worker.id, agency.id);
+    await revokeRepresentation(worker.id, agency.id);
+    expect(await canViewWorkerDocuments(owner.id, worker.id)).toBe(false);
   });
 });
