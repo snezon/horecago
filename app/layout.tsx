@@ -69,7 +69,10 @@ export default async function RootLayout({
         </header>
         <main className="max-w-6xl mx-auto px-4 py-10">{children}</main>
         <footer className="border-t border-ink-200/70 mt-16 py-8 text-center text-xs text-ink-500">
-          © {new Date().getFullYear()} HoReCaGo · Найм в индустрии гостеприимства
+          © {new Date().getFullYear()} HoReCaGo · Найм в индустрии гостеприимства ·{" "}
+          <Link href="/privacy" className="underline hover:text-ink-700">
+            Обработка персональных данных
+          </Link>
         </footer>
       </body>
     </html>

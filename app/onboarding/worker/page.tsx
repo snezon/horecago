@@ -3,7 +3,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { saveWorkerOnboarding } from "./actions";
 
-export default async function WorkerOnboardingPage() {
+export default async function WorkerOnboardingPage({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=WORKER");
   if (user.role !== "WORKER") redirect("/");
@@ -21,6 +25,12 @@ export default async function WorkerOnboardingPage() {
         <h1 className="text-3xl font-bold mb-1">Профиль соискателя</h1>
         <p className="text-ink-500 text-sm">Эту информацию увидит работодатель в вашем отклике</p>
       </div>
+
+      {searchParams.error === "consent" && (
+        <div className="mb-4 text-sm text-red-600">
+          Без согласия на обработку персональных данных профиль сохранить нельзя.
+        </div>
+      )}
 
       <form action={saveWorkerOnboarding} className="card space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">
@@ -68,6 +78,15 @@ export default async function WorkerOnboardingPage() {
             ))}
           </div>
         </div>
+        <label className="flex items-start gap-2.5 text-sm text-ink-700">
+          <input type="checkbox" name="consent" value="1" required className="accent-ink-900 mt-0.5" />
+          <span>
+            Я согласен на обработку персональных данных согласно{" "}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">
+              политике обработки персональных данных
+            </a>
+          </span>
+        </label>
         <button className="btn-primary w-full !py-3">Сохранить и продолжить</button>
       </form>
     </div>

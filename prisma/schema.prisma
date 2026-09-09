@@ -14,6 +14,8 @@ model User {
   name      String?
   phone     String?
   createdAt DateTime @default(now())
+  consentedAt      DateTime?
+  consentVersion   String?
 
   hrProfile       HRProfile?
   workerProfile   WorkerProfile?
