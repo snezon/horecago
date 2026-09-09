@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
 import { createOrg } from "@/lib/domain/orgs";
-import { inviteWorker, acceptPendingInvites } from "@/lib/domain/representation";
+import {
+  inviteWorker,
+  acceptPendingInvites,
+  revokeRepresentation,
+} from "@/lib/domain/representation";
 
 async function makeAgency(name: string) {
   const owner = await prisma.user.create({
@@ -87,5 +91,117 @@ describe("acceptPendingInvites", () => {
       data: { email: "nobody@example.com", role: "WORKER" },
     });
     expect(await acceptPendingInvites(user.id, "nobody@example.com")).toBe(0);
+  });
+
+  it("приглашение старше 60 дней не принимается и помечается EXPIRED", async () => {
+    const agency = await makeAgency("Кадры6");
+    const user = await prisma.user.create({
+      data: { email: "stale@example.com", role: "WORKER" },
+    });
+    const createdAt = new Date(Date.now() - 61 * 24 * 60 * 60 * 1000);
+    await prisma.agencyInvite.create({
+      data: {
+        agencyId: agency.id,
+        email: "stale@example.com",
+        status: "PENDING",
+        createdAt,
+      },
+    });
+
+    const accepted = await acceptPendingInvites(user.id, "stale@example.com");
+
+    expect(accepted).toBe(0);
+    expect(await prisma.representation.count()).toBe(0);
+    const invite = await prisma.agencyInvite.findFirst();
+    expect(invite?.status).toBe("EXPIRED");
+  });
+
+  it("приглашение возрастом 59 дней принимается нормально", async () => {
+    const agency = await makeAgency("Кадры7");
+    const user = await prisma.user.create({
+      data: { email: "fresh@example.com", role: "WORKER" },
+    });
+    const createdAt = new Date(Date.now() - 59 * 24 * 60 * 60 * 1000);
+    await prisma.agencyInvite.create({
+      data: {
+        agencyId: agency.id,
+        email: "fresh@example.com",
+        status: "PENDING",
+        createdAt,
+      },
+    });
+
+    const accepted = await acceptPendingInvites(user.id, "fresh@example.com");
+
+    expect(accepted).toBe(1);
+    const rep = await prisma.representation.findUnique({
+      where: { workerId_agencyId: { workerId: user.id, agencyId: agency.id } },
+    });
+    expect(rep?.status).toBe("ACTIVE");
+  });
+});
+
+describe("revokeRepresentation и приглашения", () => {
+  beforeEach(resetDb);
+
+  it("отзыв отменяет ещё не принятое (PENDING) приглашение, повторный вход не воскрешает представительство", async () => {
+    const agency = await makeAgency("Кадры9");
+    const user = await prisma.user.create({
+      data: { email: "pending-revoke@example.com", role: "WORKER" },
+    });
+    // Представительство активируется без приёма приглашения (например, по
+    // ссылке приглашения раньше), приглашение при этом остаётся PENDING.
+    await prisma.agencyInvite.create({
+      data: { agencyId: agency.id, email: "pending-revoke@example.com", status: "PENDING" },
+    });
+    await prisma.representation.create({
+      data: {
+        workerId: user.id,
+        agencyId: agency.id,
+        status: "ACTIVE",
+        activatedAt: new Date(),
+      },
+    });
+
+    await revokeRepresentation(user.id, agency.id);
+
+    const invite = await prisma.agencyInvite.findFirst();
+    expect(invite?.status).toBe("CANCELLED");
+
+    const second = await acceptPendingInvites(user.id, "pending-revoke@example.com");
+    expect(second).toBe(0);
+
+    const rep = await prisma.representation.findUnique({
+      where: { workerId_agencyId: { workerId: user.id, agencyId: agency.id } },
+    });
+    expect(rep?.status).toBe("REVOKED");
+  });
+
+  it("принятые приглашения при отзыве не трогаются", async () => {
+    const agency = await makeAgency("Кадры10");
+    const user = await prisma.user.create({
+      data: { email: "accepted-revoke@example.com", role: "WORKER" },
+    });
+    await prisma.agencyInvite.create({
+      data: {
+        agencyId: agency.id,
+        email: "accepted-revoke@example.com",
+        status: "ACCEPTED",
+        acceptedAt: new Date(),
+      },
+    });
+    await prisma.representation.create({
+      data: {
+        workerId: user.id,
+        agencyId: agency.id,
+        status: "ACTIVE",
+        activatedAt: new Date(),
+      },
+    });
+
+    await revokeRepresentation(user.id, agency.id);
+
+    const invite = await prisma.agencyInvite.findFirst();
+    expect(invite?.status).toBe("ACCEPTED");
   });
 });

@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/db";
 import { createMagicLink, INVITE_TTL_MIN } from "@/lib/auth-token";
 
+// Агентство зовёт человека, тот может решать неделями — но через два месяца
+// это уже не то же самое согласие: адрес в HoReCa часто переходит от
+// человека к человеку, и молча привязывать случайного нового владельца
+// адреса к чужому приглашению — ровно то, что мы обещаем не делать.
+export const INVITE_MAX_AGE_DAYS = 60;
+
 /**
  * Агентство приглашает работника. Учётную запись за человека мы не заводим:
  * передача нам его контактов третьей стороной без согласия запрещена (152-ФЗ).
@@ -66,14 +72,27 @@ export async function acceptPendingInvites(userId: string, email: string) {
     where: { email: normalized, status: "PENDING" },
   });
 
+  const cutoff = new Date(Date.now() - INVITE_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
+  let accepted = 0;
   for (const invite of invites) {
+    // Приглашение старше 60 дней не принимаем молча: помечаем EXPIRED, чтобы
+    // было видно, что произошло, а не оставляем висеть вечным PENDING.
+    if (invite.createdAt < cutoff) {
+      await prisma.agencyInvite.update({
+        where: { id: invite.id },
+        data: { status: "EXPIRED" },
+      });
+      continue;
+    }
+
     await activateRepresentation(userId, invite.agencyId);
     await prisma.agencyInvite.update({
       where: { id: invite.id },
       data: { status: "ACCEPTED", acceptedAt: new Date() },
     });
+    accepted += 1;
   }
-  return invites.length;
+  return accepted;
 }
 
 /**
@@ -108,6 +127,21 @@ export async function revokeRepresentation(
     where: { workerId: workerUserId, agencyId },
     data: { status: "REVOKED", revokedAt: new Date() },
   });
+
+  // Отзыв закрывает и приглашение, иначе связь восстановится при следующем
+  // входе: acceptPendingInvites подхватит оставшееся PENDING-приглашение и
+  // activateRepresentation перезапишет REVOKED обратно в ACTIVE. Принятые
+  // (ACCEPTED) приглашения не трогаем — они уже часть истории.
+  const user = await prisma.user.findUnique({
+    where: { id: workerUserId },
+    select: { email: true },
+  });
+  if (user) {
+    await prisma.agencyInvite.updateMany({
+      where: { agencyId, email: user.email, status: "PENDING" },
+      data: { status: "CANCELLED" },
+    });
+  }
 }
 
 export async function activeAgencyIds(workerUserId: string) {
