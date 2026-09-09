@@ -274,14 +274,17 @@ if (!globalForPrisma.walEnabled) {
 
 - [ ] **Step 4: Дополнить хелпер очистки**
 
-В `tests/helpers/db.ts` в начало `resetDb` (до `prisma.user.deleteMany()`) добавить:
+В `tests/helpers/db.ts` добавить эти две строки последними в теле `resetDb`,
+после `prisma.position.deleteMany()`:
 
 ```ts
   await prisma.membership.deleteMany();
   await prisma.org.deleteMany();
 ```
 
-Порядок: членства до организаций, организации до пользователей.
+Порядок важен: членства ссылаются и на пользователя, и на организацию, поэтому
+удаляются до организаций. Task 4 добавит `representation.deleteMany()` первой
+строкой тела — до профилей работников и до организаций.
 
 - [ ] **Step 5: Написать падающие тесты**
 
@@ -651,7 +654,9 @@ Expected: миграция создана.
 
 - [ ] **Step 3: Дополнить хелпер очистки**
 
-В `tests/helpers/db.ts` добавить строку перед удалением `workerProfile`:
+В `tests/helpers/db.ts` добавить эту строку **первой** в теле `resetDb` — до
+`prisma.application.deleteMany()`. Представительство ссылается и на профиль
+работника, и на организацию, поэтому чистится раньше обоих:
 
 ```ts
   await prisma.representation.deleteMany();
@@ -1113,22 +1118,82 @@ const role =
 
 - [ ] **Step 8: Применить маршрутизацию после перехода по ссылке**
 
-В `app/auth/verify/route.ts` после `consumeMagicLink` и создания пользователя:
+Важно: `User.role` — не то же самое, что роль в magic-link. Существующий код в
+`app/hr/*`, `app/onboarding/hr/actions.ts` и `app/hr/shifts/actions.ts` сравнивает
+`user.role` со строкой `"HR"`. Если записать в пользователя `"CLIENT"`, новый
+заказчик не попадёт в свой кабинет. Поэтому роль ссылки отображается в роль
+пользователя так: `CLIENT` → `"HR"`, `AGENCY` → `"AGENCY"`, `WORKER` → `"WORKER"`.
+Переименование `HR` → `CLIENT` в `User.role` — задача фазы 1, вместе с переездом
+экранов заказчика на `Org`.
+
+Заменить в `app/auth/verify/route.ts` всё, что идёт после `consumeMagicLink`,
+на следующее:
 
 ```ts
+import { NextRequest, NextResponse } from "next/server";
+import { consumeMagicLink, createSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { resolveSignupTarget } from "@/lib/domain/signup";
 import { activateRepresentation } from "@/lib/domain/representation";
 
-// ...после того как пользователь найден или создан, где isNewUser — признак создания:
-if (link.agencyId && link.role === "WORKER") {
-  await activateRepresentation(user.id, link.agencyId);
+/** Роль ссылки → роль пользователя. "HR" остаётся до переезда экранов в фазе 1. */
+function userRoleFor(linkRole: string | null): string {
+  if (linkRole === "AGENCY") return "AGENCY";
+  if (linkRole === "CLIENT" || linkRole === "HR") return "HR";
+  return "WORKER";
 }
 
-const target = resolveSignupTarget(
-  { role: link.role, agencyId: link.agencyId },
-  isNewUser,
-);
-return NextResponse.redirect(new URL(target, request.url));
+export async function GET(req: NextRequest) {
+  const token = req.nextUrl.searchParams.get("token");
+  if (!token) return NextResponse.redirect(new URL("/login", req.url));
+
+  const link = await consumeMagicLink(token);
+  if (!link) {
+    return NextResponse.redirect(new URL("/login?error=expired", req.url));
+  }
+
+  let user = await prisma.user.findUnique({
+    where: { email: link.email },
+    include: { hrProfile: true, workerProfile: true },
+  });
+
+  const isNewUser = !user;
+  if (!user) {
+    user = await prisma.user.create({
+      data: { email: link.email, role: userRoleFor(link.role) },
+      include: { hrProfile: true, workerProfile: true },
+    });
+  }
+
+  await createSession(user.id);
+
+  // Человек перешёл по ссылке приглашения — этим он сам подтвердил связь с агентством.
+  if (link.agencyId && link.role === "WORKER") {
+    await activateRepresentation(user.id, link.agencyId);
+  }
+
+  const target = resolveSignupTarget(
+    { role: link.role, agencyId: link.agencyId },
+    isNewUser,
+  );
+  if (target !== "/") {
+    return NextResponse.redirect(new URL(target, req.url));
+  }
+
+  // Вернувшийся пользователь: прежняя маршрутизация по незаполненному профилю.
+  if (user.role === "HR" && !user.hrProfile) {
+    return NextResponse.redirect(new URL("/onboarding/hr", req.url));
+  }
+  if (user.role === "WORKER" && !user.workerProfile) {
+    return NextResponse.redirect(new URL("/onboarding/worker", req.url));
+  }
+  if (user.role === "AGENCY") {
+    return NextResponse.redirect(new URL("/agency", req.url));
+  }
+
+  const dest = user.role === "HR" ? "/hr" : "/feed";
+  return NextResponse.redirect(new URL(dest, req.url));
+}
 ```
 
 Активация представительства происходит именно здесь: человек перешёл по ссылке
