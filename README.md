@@ -41,6 +41,16 @@ APP_URL="http://localhost:3100"
 SESSION_SECRET="any-random-string"
 ```
 
+## Переменные окружения
+
+Кроме `DATABASE_URL`, `APP_URL`, `SESSION_SECRET` и `SMTP_*` (см. раздел про почту):
+
+- `ENABLE_DEMO` — включает демонстрационный вход без пароля (`/demo`, `/api/demo/login`).
+  В dev-режиме демо-вход работает всегда; в проде (`NODE_ENV=production`) он выключен,
+  пока эта переменная не выставлена в `1`. Держать включённой на постоянку не стоит —
+  включать точечно, на время демонстрации.
+- `ADMIN_EMAILS` — список почт через запятую, которым доступна админка (`/admin/...`).
+
 ## Архитектура
 
 ### Модели (Prisma)
@@ -101,6 +111,26 @@ SESSION_SECRET="any-random-string"
 
 **Резервное копирование**: в приложении включён режим WAL, поэтому рядом с `prod.db` живут файлы `prod.db-wal` и `prod.db-shm` с недописанными транзакциями. Обычный `cp` базы без них может потерять последние изменения. Правильно — либо `sqlite3 prod.db ".backup /путь/backup.db"`, либо `PRAGMA wal_checkpoint(TRUNCATE);` перед копированием всех трёх файлов вместе.
 
+### Бэкапы
+
+`scripts/backup-db.sh` делает копию через `sqlite3 .backup` (транзакции не теряются), сжимает
+её и удаляет копии старше `KEEP_DAYS` (по умолчанию 14 дней). Кладёт в
+`/root/horecago-data/backups/`.
+
+Запуск вручную:
+```bash
+./scripts/backup-db.sh
+```
+
+Строка в crontab для ежедневного запуска в 4 утра:
+```
+0 4 * * * DB_PATH=/root/horecago-data/db/prod.db /root/horecago/scripts/backup-db.sh >> /var/log/horecago-backup.log 2>&1
+```
+
+Восстановление — руками, без автоматики: остановить `systemctl stop horecago`,
+распаковать нужный `prod-YYYY-MM-DD-HHMM.db.gz` и подложить вместо `prod.db`, затем
+`systemctl start horecago`. Перед подменой сохрани текущий файл на всякий случай.
+
 ### systemd
 
 `/etc/systemd/system/horecago.service` запускает `npm run start` (`next start -p 3100`) с `Restart=always`. Логи: `journalctl -u horecago -f`.
@@ -128,6 +158,12 @@ Caddy сам выпускает и продлевает Let's Encrypt серти
 | TXT | `@` | `mailru-domain: ...` | подтверждение Mail.ru |
 | TXT | `@` | `v=spf1 redirect=_spf.mail.ru` | SPF |
 | TXT | `mailru._domainkey` | `v=DKIM1; k=rsa; p=...` | DKIM |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:noreply@horecago.tech` | DMARC |
+
+Без DMARC крупные почтовые службы (Gmail, Mail.ru и т.п.) чаще складывают массовую
+рассылку с домена в спам — запись подтверждает, что письма от `horecago.tech`
+легитимны. Начинаем с мягкой политики `p=none` (только наблюдение, отчёты приходят на
+`rua`); после месяца наблюдения без аномалий её можно ужесточить до `p=quarantine`.
 
 **Важно**: AAAA-записи у домена удалены — иначе Let's Encrypt идёт по IPv6 на чужой сервер reg.ru-хостинга. **Не возвращать AAAA, пока не появится IPv6 на нашем VPS.**
 
@@ -175,6 +211,6 @@ ssh root@5.42.117.211 'cd /root/horecago && npm ci && npx prisma migrate deploy 
 - Поиск вакансий по тексту
 - Pagination в ленте
 - Архив закрытых вакансий у HR
-- Бэкапы SQLite (cron + rclone в облако). **Внимание**: база в режиме WAL — не копировать `prod.db` голым `cp`, см. раздел «Резервное копирование» выше
+- Локальный бэкап есть (`scripts/backup-db.sh` + crontab, см. раздел «Бэкапы»); вынос копий за пределы сервера (rclone в облако) пока не сделан
 - Sentry / health-чек / UptimeRobot
 - CI: GitHub Actions → автодеплой на push в main

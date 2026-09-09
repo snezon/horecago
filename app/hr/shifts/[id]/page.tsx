@@ -10,6 +10,8 @@ import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
 import { agencyLabel } from "@/lib/agency-label";
 
+const APPLICATIONS_LIMIT = 200;
+
 const kindLabel: Record<string, string> = {
   PASSPORT: "Паспорт",
   MED_BOOK: "Медкнижка",
@@ -40,6 +42,7 @@ export default async function HRShiftPage({
             },
           },
         },
+        take: APPLICATIONS_LIMIT,
       },
     },
   });
@@ -146,6 +149,10 @@ export default async function HRShiftPage({
           </form>
         </details>
       </article>
+
+      {shift.applications.length === APPLICATIONS_LIMIT && (
+        <p className="text-sm text-ink-500">Показаны первые {APPLICATIONS_LIMIT} откликов — уточните фильтр</p>
+      )}
 
       <section>
         <div className="flex items-center justify-between mb-4">

@@ -19,6 +19,8 @@ const STATUS_LABEL: Record<string, string> = {
   REJECTED: "Отклонено",
 };
 
+const APPS_LIMIT = 100;
+
 export default async function ApplicationsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=WORKER");
@@ -32,6 +34,7 @@ export default async function ApplicationsPage() {
         include: { position: true, hr: { include: { hrProfile: true } } },
       },
     },
+    take: APPS_LIMIT,
   });
 
   const invitations = apps.filter((a) => a.initiator === "HR");
@@ -82,6 +85,10 @@ export default async function ApplicationsPage() {
           </ul>
         )}
       </section>
+
+      {apps.length === APPS_LIMIT && (
+        <p className="text-sm text-ink-500">Показаны первые {APPS_LIMIT} — уточните фильтр</p>
+      )}
     </div>
   );
 }

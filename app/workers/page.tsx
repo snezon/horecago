@@ -9,6 +9,8 @@ import { agencyLabel } from "@/lib/agency-label";
 
 export const dynamic = "force-dynamic";
 
+const WORKERS_LIMIT = 200;
+
 export default async function WorkersPage({ searchParams }: { searchParams: { position?: string } }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=HR");
@@ -36,6 +38,7 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
       },
     },
     orderBy: { createdAt: "desc" },
+    take: WORKERS_LIMIT,
   });
 
   const agencyMap = await representingAgencies(workers.map((w) => w.id));
@@ -123,6 +126,10 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
             );
           })}
         </ul>
+      )}
+
+      {workers.length === WORKERS_LIMIT && (
+        <p className="text-sm text-ink-500">Показаны первые {WORKERS_LIMIT} — уточните фильтр</p>
       )}
     </div>
   );

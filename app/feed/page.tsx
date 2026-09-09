@@ -5,6 +5,8 @@ import { shiftLabel, formatRub } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
+const SHIFTS_LIMIT = 200;
+
 function plural(n: number, one: string, few: string, many: string) {
   const mod10 = n % 10;
   const mod100 = n % 100;
@@ -26,6 +28,7 @@ export default async function FeedPage({ searchParams }: { searchParams: { posit
     },
     orderBy: { shiftStart: "asc" },
     include: { position: true, hr: { include: { hrProfile: true } } },
+    take: SHIFTS_LIMIT,
   });
 
   return (
@@ -91,6 +94,10 @@ export default async function FeedPage({ searchParams }: { searchParams: { posit
             );
           })}
         </ul>
+      )}
+
+      {shifts.length === SHIFTS_LIMIT && (
+        <p className="text-sm text-ink-500">Показаны первые {SHIFTS_LIMIT} — уточните фильтр</p>
       )}
     </div>
   );

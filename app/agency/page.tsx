@@ -40,6 +40,8 @@ function connectionState(
   return "PENDING";
 }
 
+const INVITES_LIMIT = 200;
+
 const DELIVERY_ERROR_PREVIEW_MAX = 120;
 
 // В подсказку выводим только начало текста ошибки: почтовый сервер может
@@ -79,7 +81,7 @@ export default async function AgencyDashboardPage({
   const invites = await prisma.agencyInvite.findMany({
     where: { agencyId },
     orderBy: { createdAt: "desc" },
-    take: 200,
+    take: INVITES_LIMIT,
   });
 
   const reps = await prisma.representation.findMany({
@@ -202,6 +204,10 @@ export default async function AgencyDashboardPage({
               </tbody>
             </table>
           </div>
+        )}
+
+        {invites.length === INVITES_LIMIT && (
+          <p className="text-sm text-ink-500 mt-3">Показаны первые {INVITES_LIMIT} — уточните фильтр</p>
         )}
       </section>
     </div>

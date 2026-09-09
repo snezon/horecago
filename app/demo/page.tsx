@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Building2, UserRound, ArrowRight } from "lucide-react";
 import DemoLoginButton from "./DemoLoginButton";
@@ -7,6 +8,12 @@ const DEMO_DOMAIN = "demo.horecago.test";
 export const dynamic = "force-dynamic";
 
 export default async function DemoPage() {
+  // Страница со списком демо-адресов пускает без пароля, поэтому в проде
+  // доступна только при явно включённом флаге.
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_DEMO !== "1") {
+    notFound();
+  }
+
   const users = await prisma.user.findMany({
     where: { email: { endsWith: `@${DEMO_DOMAIN}` } },
     include: {

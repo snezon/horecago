@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { shiftLabel, formatRub } from "@/lib/datetime";
 
+const SHIFTS_LIMIT = 100;
+
 export default async function HRDashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=HR");
@@ -18,6 +20,7 @@ export default async function HRDashboardPage() {
       position: true,
       _count: { select: { applications: { where: { status: "PENDING" } } } },
     },
+    take: SHIFTS_LIMIT,
   });
 
   const open = shifts.filter((s) => s.status === "OPEN").length;
@@ -97,6 +100,10 @@ export default async function HRDashboardPage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {shifts.length === SHIFTS_LIMIT && (
+          <p className="text-sm text-ink-500 mt-3">Показаны первые {SHIFTS_LIMIT} — уточните фильтр</p>
         )}
       </section>
     </div>
