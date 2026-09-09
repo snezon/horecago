@@ -141,6 +141,28 @@ describe("activateRepresentation", () => {
     expect(await prisma.representation.count()).toBe(1);
   });
 
+  it("для пользователя с ролью AGENCY не создаёт представительство", async () => {
+    const agency = await makeAgency("Кадры13");
+    const user = await prisma.user.create({
+      data: { email: "agencyowner2@example.com", role: "AGENCY" },
+    });
+
+    await activateRepresentation(user.id, agency.id);
+
+    expect(await prisma.representation.count()).toBe(0);
+  });
+
+  it("для пользователя с ролью HR не создаёт представительство", async () => {
+    const agency = await makeAgency("Кадры14");
+    const user = await prisma.user.create({
+      data: { email: "hrowner2@example.com", role: "HR" },
+    });
+
+    await activateRepresentation(user.id, agency.id);
+
+    expect(await prisma.representation.count()).toBe(0);
+  });
+
   it("работает для пользователя без WorkerProfile — регрессия на FK-падение при переходе по приглашению", async () => {
     const agency = await makeAgency("Кадры10");
     const user = await makeUserWithoutProfile("noprofile2@example.com");

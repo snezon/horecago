@@ -34,10 +34,18 @@ export async function inviteWorker(agencyId: string, email: string) {
   return { representationId, url, token };
 }
 
+/**
+ * Представительство связывает агентство только с работником. Проверка роли
+ * живёт здесь, а не у вызывающих: у этой функции их будет больше в следующей
+ * фазе, и полагаться каждый раз на внимательность вызывающего кода нельзя.
+ */
 export async function activateRepresentation(
   workerUserId: string,
   agencyId: string,
 ) {
+  const user = await prisma.user.findUnique({ where: { id: workerUserId } });
+  if (!user || user.role !== "WORKER") return;
+
   await prisma.representation.upsert({
     where: { workerId_agencyId: { workerId: workerUserId, agencyId } },
     update: { status: "ACTIVE", activatedAt: new Date(), revokedAt: null },
