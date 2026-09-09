@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { FileText, Trash2, Upload, ExternalLink } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { representingAgencies } from "@/lib/domain/representation";
 import { saveWorkerOnboarding } from "@/app/onboarding/worker/actions";
-import { deleteDocument } from "./actions";
+import { deleteDocument, revokeMyRepresentation } from "./actions";
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ export default async function ProfilePage() {
     where: { workerId: user.id },
     orderBy: { createdAt: "desc" },
   });
+  const agencies = (await representingAgencies([user.id])).get(user.id) ?? [];
 
   const kindLabel: Record<string, string> = {
     PASSPORT: "Паспорт",
@@ -76,6 +78,24 @@ export default async function ProfilePage() {
           <button className="btn-primary !py-2.5">Сохранить</button>
         </form>
       </section>
+
+      {agencies.length > 0 && (
+        <section className="card">
+          <h2 className="section-title mb-5">Кто вас представляет</h2>
+          <ul className="space-y-2">
+            {agencies.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-ink-200/70">
+                <div className="font-medium text-sm text-ink-900">{a.name}</div>
+                <form action={revokeMyRepresentation}>
+                  <input type="hidden" name="agencyId" value={a.id} />
+                  <button className="btn-danger-ghost !py-1.5 !px-3 text-sm">Отозвать</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-ink-500 mt-4">Отзыв не удаляет историю ваших смен.</p>
+        </section>
+      )}
 
       <section className="card">
         <h2 className="section-title mb-2">Документы</h2>
