@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
+import { agencyLabel } from "@/lib/agency-label";
 
 export const dynamic = "force-dynamic";
 
@@ -125,10 +126,6 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
       )}
     </div>
   );
-}
-
-function agencyLabel(agencies: { id: string; name: string }[]) {
-  return `Представлен агентством «${agencies.map((a) => a.name).join(", ")}»`;
 }
 
 function plural(n: number, one: string, few: string, many: string) {

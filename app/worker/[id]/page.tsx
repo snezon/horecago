@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { inviteWorker } from "./actions";
 import { shiftLabel, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
+import { agencyLabel, representedNotice } from "@/lib/agency-label";
 
 const kindLabel: Record<string, string> = {
   PASSPORT: "Паспорт",
@@ -235,14 +236,6 @@ export default async function WorkerPage({
       </section>
     </div>
   );
-}
-
-function agencyLabel(agencies: { id: string; name: string }[]) {
-  return `Представлен агентством «${agencies.map((a) => a.name).join(", ")}»`;
-}
-
-function representedNotice(agencies: { id: string; name: string }[]) {
-  return `${agencyLabel(agencies)}. Приглашение оформляется через агентство.`;
 }
 
 function statusLabel(a: { initiator: string; status: string }) {

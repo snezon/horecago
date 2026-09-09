@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { updateShift, hireApplicant, rejectApplicant } from "../actions";
 import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
+import { agencyLabel } from "@/lib/agency-label";
 
 const kindLabel: Record<string, string> = {
   PASSPORT: "Паспорт",
@@ -267,8 +268,4 @@ export default async function HRShiftPage({ params }: { params: { id: string } }
       )}
     </div>
   );
-}
-
-function agencyLabel(agencies: { id: string; name: string }[]) {
-  return `Представлен агентством «${agencies.map((a) => a.name).join(", ")}»`;
 }
