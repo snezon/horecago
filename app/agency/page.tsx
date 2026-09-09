@@ -6,17 +6,51 @@ import { agencyIdsOf } from "@/lib/domain/access";
 import { MAX_INVITES_PER_BATCH } from "@/lib/domain/emails";
 import { sendWorkerInvites } from "./actions";
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Ждём подтверждения",
+type ConnectionState = "ACTIVE" | "REVOKED" | "PENDING" | "CANCELLED" | "EXPIRED";
+
+const CONNECTION_LABELS: Record<ConnectionState, string> = {
   ACTIVE: "Работает с вами",
-  REVOKED: "Отозвано",
+  REVOKED: "Отозвано работником",
+  PENDING: "Ждём подтверждения",
+  CANCELLED: "Приглашение отменено",
+  EXPIRED: "Приглашение просрочено",
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  PENDING: "badge-warning",
+const CONNECTION_BADGE: Record<ConnectionState, string> = {
   ACTIVE: "badge-neutral",
   REVOKED: "badge-muted",
+  PENDING: "badge-warning",
+  CANCELLED: "badge-muted",
+  EXPIRED: "badge-muted",
 };
+
+// Представительство появляется, только когда человек уже зарегистрирован —
+// для нового приглашённого его пока нет вовсе, поэтому статус связи бере́м
+// из представительства, если оно есть, а иначе из самого приглашения.
+function connectionState(
+  repStatus: string | undefined,
+  inviteStatus: string,
+): ConnectionState {
+  if (repStatus === "ACTIVE") return "ACTIVE";
+  if (repStatus === "REVOKED") return "REVOKED";
+  if (inviteStatus === "CANCELLED") return "CANCELLED";
+  if (inviteStatus === "EXPIRED") return "EXPIRED";
+  // PENDING (представительство или приглашение) и ACCEPTED без активного
+  // представительства — во всех случаях ждём, когда человек подтвердит связь.
+  return "PENDING";
+}
+
+const DELIVERY_ERROR_PREVIEW_MAX = 120;
+
+// В подсказку выводим только начало текста ошибки: почтовый сервер может
+// вернуть техническую внутренность (адрес, порт, стектрейс), полный текст
+// уже есть в журнале сервера — на странице агентства он не нужен целиком.
+function deliveryErrorPreview(raw: string | null): string {
+  const text = raw ?? "неизвестная ошибка";
+  return text.length > DELIVERY_ERROR_PREVIEW_MAX
+    ? text.slice(0, DELIVERY_ERROR_PREVIEW_MAX)
+    : text;
+}
 
 function parseCount(raw: string | string[] | undefined): number {
   const n = Number(Array.isArray(raw) ? raw[0] : raw);
@@ -38,16 +72,21 @@ export default async function AgencyDashboardPage({
   const org = await prisma.org.findUnique({ where: { id: agencyId } });
   if (!org) redirect("/onboarding/agency");
 
+  // Список строим от приглашений, а не от представительств: представительство
+  // заводится только для уже зарегистрированного человека, а основной сценарий
+  // пилота — звать людей, которых в системе ещё нет. Для них строка должна
+  // появиться сразу, до какой-либо регистрации.
+  const invites = await prisma.agencyInvite.findMany({
+    where: { agencyId },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
   const reps = await prisma.representation.findMany({
     where: { agencyId },
     include: { worker: true },
-    orderBy: { createdAt: "desc" },
   });
-
-  const invites = await prisma.agencyInvite.findMany({
-    where: { agencyId, email: { in: reps.map((r) => r.worker.email) } },
-  });
-  const inviteByEmail = new Map(invites.map((i) => [i.email, i]));
+  const repByEmail = new Map(reps.map((r) => [r.worker.email, r]));
 
   const sent = parseCount(searchParams.sent);
   const failed = parseCount(searchParams.failed);
@@ -114,8 +153,8 @@ export default async function AgencyDashboardPage({
       </section>
 
       <section>
-        <h2 className="section-title mb-4">Представительства</h2>
-        {reps.length === 0 ? (
+        <h2 className="section-title mb-4">Приглашённые работники</h2>
+        {invites.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-ink-600">Пока никого не пригласили</p>
           </div>
@@ -131,31 +170,31 @@ export default async function AgencyDashboardPage({
                 </tr>
               </thead>
               <tbody>
-                {reps.map((rep) => {
-                  const invite = inviteByEmail.get(rep.worker.email);
-                  const deliveryFailed = invite?.deliveryStatus === "FAILED";
+                {invites.map((invite) => {
+                  const rep = repByEmail.get(invite.email);
+                  const state = connectionState(rep?.status, invite.status);
+                  const deliveryFailed = invite.deliveryStatus === "FAILED";
+                  const label = rep?.worker.name || rep?.worker.email || invite.email;
                   return (
-                    <tr key={rep.id} className="border-b border-ink-100 last:border-0">
-                      <td className="px-4 py-3 text-ink-900">{rep.worker.name || rep.worker.email}</td>
+                    <tr key={invite.id} className="border-b border-ink-100 last:border-0">
+                      <td className="px-4 py-3 text-ink-900">{label}</td>
                       <td className="px-4 py-3">
-                        <span className={STATUS_BADGE[rep.status] ?? "badge-neutral"}>
-                          {STATUS_LABELS[rep.status] ?? rep.status}
+                        <span className={CONNECTION_BADGE[state]}>
+                          {CONNECTION_LABELS[state]}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {deliveryFailed ? (
+                        {deliveryFailed && (
                           <span
                             className="badge-warning cursor-help"
-                            title={invite?.deliveryError ?? "неизвестная ошибка"}
+                            title={deliveryErrorPreview(invite.deliveryError)}
                           >
                             Письмо не доставлено
                           </span>
-                        ) : (
-                          <span className="text-ink-400">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-ink-500">
-                        {rep.createdAt.toLocaleDateString("ru-RU")}
+                        {invite.createdAt.toLocaleDateString("ru-RU")}
                       </td>
                     </tr>
                   );

@@ -23,9 +23,17 @@ export async function sendWorkerInvites(formData: FormData) {
   let sent = 0;
   let failed = 0;
   for (const email of list) {
-    const result = await inviteWorker(agencyId, email);
-    if (result.delivery.ok) sent++;
-    else failed++;
+    // Один упавший адрес (например, сбой базы, а не почты) не должен
+    // обрывать всю пачку — иначе агентство не увидит сводку даже по тем,
+    // что уже обработались.
+    try {
+      const result = await inviteWorker(agencyId, email);
+      if (result.delivery.ok) sent++;
+      else failed++;
+    } catch (e) {
+      console.error("Не удалось обработать приглашение:", email, e);
+      failed++;
+    }
   }
 
   const skipped = emails.length - list.length;
