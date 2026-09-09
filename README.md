@@ -18,7 +18,7 @@
 - **Next.js 14** (App Router) + TypeScript + TailwindCSS
 - **Prisma + SQLite** (`prisma/dev.db` локально, `/root/horecago-data/db/prod.db` на проде)
 - **Magic-link auth** самописный (токен в URL, 15 мин TTL, sessions в куке 30 дней)
-- **Nodemailer** через SMTP Mail.ru для бизнеса (`noreply@horecago.tech`)
+- **Nodemailer** через SMTP Timeweb (`noreply@horecago.tech`); обращения субъектов ПД — на `privacy@horecago.tech`
 - **Caddy 2** — reverse proxy + автоматический Let's Encrypt
 - **systemd** — управление процессом
 - **Ubuntu 24.04 LTS** на Timeweb VPS (`5.42.117.211`)
@@ -167,7 +167,7 @@ Caddy сам выпускает и продлевает Let's Encrypt серти
 | TXT | `@` | `mailru-domain: ...` | подтверждение Mail.ru |
 | TXT | `@` | `v=spf1 redirect=_spf.mail.ru` | SPF |
 | TXT | `mailru._domainkey` | `v=DKIM1; k=rsa; p=...` | DKIM |
-| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:noreply@horecago.tech` | DMARC |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:privacy@horecago.tech` | DMARC |
 
 Без DMARC крупные почтовые службы (Gmail, Mail.ru и т.п.) чаще складывают массовую
 рассылку с домена в спам — запись подтверждает, что письма от `horecago.tech`
@@ -178,7 +178,7 @@ Caddy сам выпускает и продлевает Let's Encrypt серти
 
 ## Email (Mail.ru для бизнеса)
 
-- Подключён домен `horecago.tech`, ящик `noreply@horecago.tech`
+- Подключён домен `horecago.tech`, ящики `noreply@horecago.tech` (отправка) и `privacy@horecago.tech` (обращения по 152-ФЗ, отчёты DMARC)
 - В настройках включён «SMTP по паролю» (отдельный пароль для приложений)
 - В `.env` на проде: `SMTP_HOST=smtp.mail.ru`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=noreply@horecago.tech`, `SMTP_PASS=...`, `SMTP_FROM=noreply@horecago.tech`
 - До запуска пилота нужно настроить чтение или пересылку ящика `noreply@horecago.tech` — политика указывает его как канал обращений по персональным данным, а ящики с таким префиксом обычно никто не читает

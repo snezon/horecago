@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         <p className="text-sm text-ink-700">
           Оператором обработки персональных данных является сервис HoReCaGo.
           По всем вопросам, связанным с обработкой ваших данных, можно написать
-          на <a href="mailto:noreply@horecago.tech" className="underline">noreply@horecago.tech</a>.
+          на <a href="mailto:privacy@horecago.tech" className="underline">privacy@horecago.tech</a>.
         </p>
       </section>
 
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
       <section className="card space-y-2">
         <h2 className="section-title">Как отозвать согласие</h2>
         <p className="text-sm text-ink-700">
-          Напишите письмо на <a href="mailto:noreply@horecago.tech" className="underline">noreply@horecago.tech</a> —
+          Напишите письмо на <a href="mailto:privacy@horecago.tech" className="underline">privacy@horecago.tech</a> —
           мы прекратим обработку и удалим данные по вашему запросу. Отзыв
           представительства агентства эта переписка не заменяет — он
           выполняется в личном кабинете.
