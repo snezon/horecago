@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
-import { createOrg, addMember } from "@/lib/domain/orgs";
+import { createOrg, addMember, upsertClientOrgForUser } from "@/lib/domain/orgs";
 
 async function makeUser(email: string) {
   return prisma.user.create({ data: { email, role: "WORKER" } });
@@ -78,5 +78,50 @@ describe("addMember", () => {
     });
     expect(membership?.role).toBe("MANAGER");
     expect(await prisma.membership.count({ where: { orgId: org.id } })).toBe(2);
+  });
+});
+
+describe("upsertClientOrgForUser", () => {
+  beforeEach(resetDb);
+
+  it("создаёт организацию заказчика, если её ещё не было", async () => {
+    const user = await makeUser("newclient@example.com");
+
+    const org = await upsertClientOrgForUser(user.id, "Отель Прибой");
+
+    expect(org.type).toBe("CLIENT");
+    expect(org.verified).toBe(true);
+
+    const membership = await prisma.membership.findUnique({
+      where: { userId_orgId: { userId: user.id, orgId: org.id } },
+    });
+    expect(membership?.role).toBe("OWNER");
+  });
+
+  it("при повторном вызове с другим названием обновляет имя, а не создаёт вторую организацию", async () => {
+    const user = await makeUser("renaming@example.com");
+
+    await upsertClientOrgForUser(user.id, "Отель Прибой");
+    const org = await upsertClientOrgForUser(user.id, "Отель Прибой Люкс");
+
+    expect(org.name).toBe("Отель Прибой Люкс");
+    expect(await prisma.org.count()).toBe(1);
+  });
+
+  it("не трогает организации типа AGENCY", async () => {
+    const user = await makeUser("agencyowner@example.com");
+    const agency = await createOrg({
+      type: "AGENCY",
+      name: "Кадры",
+      ownerUserId: user.id,
+    });
+
+    const clientOrg = await upsertClientOrgForUser(user.id, "Отель Заря");
+
+    const untouchedAgency = await prisma.org.findUnique({ where: { id: agency.id } });
+    expect(untouchedAgency?.name).toBe("Кадры");
+    expect(clientOrg.type).toBe("CLIENT");
+    expect(clientOrg.id).not.toBe(agency.id);
+    expect(await prisma.org.count()).toBe(2);
   });
 });

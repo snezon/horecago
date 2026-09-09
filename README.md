@@ -99,6 +99,8 @@ SESSION_SECRET="any-random-string"
 
 `.env` на проде содержит `UPLOADS_DIR` и `DATABASE_URL` указывающие в `horecago-data/`, чтобы редеплой не трогал данные.
 
+**Резервное копирование**: в приложении включён режим WAL, поэтому рядом с `prod.db` живут файлы `prod.db-wal` и `prod.db-shm` с недописанными транзакциями. Обычный `cp` базы без них может потерять последние изменения. Правильно — либо `sqlite3 prod.db ".backup /путь/backup.db"`, либо `PRAGMA wal_checkpoint(TRUNCATE);` перед копированием всех трёх файлов вместе.
+
 ### systemd
 
 `/etc/systemd/system/horecago.service` запускает `npm run start` (`next start -p 3100`) с `Restart=always`. Логи: `journalctl -u horecago -f`.
@@ -172,6 +174,6 @@ ssh root@5.42.117.211 'cd /root/horecago && npm ci && npx prisma migrate deploy 
 - Поиск вакансий по тексту
 - Pagination в ленте
 - Архив закрытых вакансий у HR
-- Бэкапы SQLite (cron + rclone в облако)
+- Бэкапы SQLite (cron + rclone в облако). **Внимание**: база в режиме WAL — не копировать `prod.db` голым `cp`, см. раздел «Резервное копирование» выше
 - Sentry / health-чек / UptimeRobot
 - CI: GitHub Actions → автодеплой на push в main

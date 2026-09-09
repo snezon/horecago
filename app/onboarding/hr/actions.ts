@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { upsertClientOrgForUser } from "@/lib/domain/orgs";
 
 export async function saveHrOnboarding(formData: FormData) {
   const user = await requireUser();
@@ -19,6 +20,7 @@ export async function saveHrOnboarding(formData: FormData) {
     update: { hotelName, address },
     create: { userId: user.id, hotelName, address },
   });
+  await upsertClientOrgForUser(user.id, hotelName);
 
   redirect("/hr");
 }

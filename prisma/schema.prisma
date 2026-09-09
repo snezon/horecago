@@ -10,7 +10,7 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  role      String   // "HR" | "WORKER"
+  role      String   // "HR" | "WORKER" | "AGENCY"
   name      String?
   phone     String?
   createdAt DateTime @default(now())

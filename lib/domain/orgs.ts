@@ -37,3 +37,30 @@ export async function addMember(
     create: { userId, orgId, role },
   });
 }
+
+/**
+ * Организация заказчика создаётся при заполнении профиля и переименовывается
+ * вместе с ним, чтобы название в реестре не расходилось с анкетой. Заказчиков
+ * мы не модерируем (в отличие от агентств, которым верификация закрывает
+ * доступ к витрине заявок), поэтому организация сразу верифицирована —
+ * так же, как это делает скрипт миграции старых HR-профилей.
+ */
+export async function upsertClientOrgForUser(userId: string, name: string) {
+  const membership = await prisma.membership.findFirst({
+    where: { userId, org: { type: "CLIENT" } },
+  });
+
+  if (!membership) {
+    return createOrg({
+      type: "CLIENT",
+      name,
+      ownerUserId: userId,
+      verified: true,
+    });
+  }
+
+  return prisma.org.update({
+    where: { id: membership.orgId },
+    data: { name },
+  });
+}
