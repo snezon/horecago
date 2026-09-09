@@ -127,9 +127,18 @@ SESSION_SECRET="any-random-string"
 0 4 * * * DB_PATH=/root/horecago-data/db/prod.db /root/horecago/scripts/backup-db.sh >> /var/log/horecago-backup.log 2>&1
 ```
 
-Восстановление — руками, без автоматики: остановить `systemctl stop horecago`,
-распаковать нужный `prod-YYYY-MM-DD-HHMM.db.gz` и подложить вместо `prod.db`, затем
-`systemctl start horecago`. Перед подменой сохрани текущий файл на всякий случай.
+Восстановление — руками, без автоматики. Подставь нужную дату вместо `ГГГГ-ММ-ДД-ЧЧММ`
+и выполни по порядку (перед этим стоит сохранить текущий `prod.db` на всякий случай):
+
+```bash
+systemctl stop horecago
+gunzip -c /root/horecago-data/backups/prod-ГГГГ-ММ-ДД-ЧЧММ.db.gz > /root/horecago-data/db/prod.db
+rm -f /root/horecago-data/db/prod.db-wal /root/horecago-data/db/prod.db-shm
+systemctl start horecago
+```
+
+Файлы `-wal` и `-shm` удаляем, потому что они остались от прежней базы и рядом с
+восстановленной не нужны.
 
 ### systemd
 
