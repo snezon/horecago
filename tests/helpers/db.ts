@@ -13,4 +13,6 @@ export async function resetDb() {
   await prisma.magicLink.deleteMany();
   await prisma.user.deleteMany();
   await prisma.position.deleteMany();
+  await prisma.membership.deleteMany();
+  await prisma.org.deleteMany();
 }
