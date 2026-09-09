@@ -2,7 +2,9 @@ import { migrateHrProfilesToOrgs } from "../lib/domain/migrate-hr-to-org";
 
 migrateHrProfilesToOrgs()
   .then((r) => {
-    console.log(`Создано организаций: ${r.created}, пропущено: ${r.skipped}`);
+    console.log(
+      `Создано организаций: ${r.created}, пропущено: ${r.skipped}, восстановлено: ${r.repaired}`,
+    );
     process.exit(0);
   })
   .catch((e) => {

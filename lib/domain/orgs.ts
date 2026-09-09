@@ -9,6 +9,7 @@ export async function createOrg(input: {
   legalName?: string;
   inn?: string;
   ownerUserId: string;
+  verified?: boolean;
 }) {
   const org = await prisma.org.create({
     data: {
@@ -16,6 +17,7 @@ export async function createOrg(input: {
       name: input.name,
       legalName: input.legalName ?? null,
       inn: input.inn ?? null,
+      verified: input.verified ?? false,
     },
   });
 

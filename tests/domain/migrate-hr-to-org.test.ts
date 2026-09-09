@@ -46,4 +46,28 @@ describe("migrateHrProfilesToOrgs", () => {
     expect(second.skipped).toBe(1);
     expect(await prisma.org.count()).toBe(1);
   });
+
+  it("чинит организацию, пострадавшую от сбоя до verified-фикса", async () => {
+    await makeHr("hr4@example.com", "Отель Юг");
+
+    await migrateHrProfilesToOrgs();
+    const org = await prisma.org.findFirst({ where: { name: "Отель Юг" } });
+    await prisma.org.update({ where: { id: org!.id }, data: { verified: false } });
+
+    const result = await migrateHrProfilesToOrgs();
+
+    expect(result.repaired).toBe(1);
+    expect(result.created).toBe(0);
+    const fixed = await prisma.org.findUnique({ where: { id: org!.id } });
+    expect(fixed?.verified).toBe(true);
+  });
+
+  it("обычный повторный запуск на корректных данных ничего не чинит", async () => {
+    await makeHr("hr5@example.com", "Отель Центр");
+
+    await migrateHrProfilesToOrgs();
+    const second = await migrateHrProfilesToOrgs();
+
+    expect(second.repaired).toBe(0);
+  });
 });
