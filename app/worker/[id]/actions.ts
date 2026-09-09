@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { isRepresented } from "@/lib/domain/representation";
 
 export async function inviteWorker(formData: FormData) {
   const user = await requireUser();
@@ -16,6 +17,10 @@ export async function inviteWorker(formData: FormData) {
   const shift = await prisma.shift.findUnique({ where: { id: shiftId } });
   if (!shift || shift.hrId !== user.id || shift.status === "CLOSED") {
     redirect(`/worker/${workerId}`);
+  }
+
+  if (await isRepresented(workerId)) {
+    redirect(`/worker/${workerId}?error=represented`);
   }
 
   // Idempotent: don't duplicate if invitation/application already exists

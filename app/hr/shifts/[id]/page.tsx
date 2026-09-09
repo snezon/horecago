@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { updateShift, hireApplicant, rejectApplicant } from "../actions";
 import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
+import { representingAgencies } from "@/lib/domain/representation";
 
 const kindLabel: Record<string, string> = {
   PASSPORT: "Паспорт",
@@ -47,6 +48,8 @@ export default async function HRShiftPage({ params }: { params: { id: string } }
     list.push(d);
     docsByWorker.set(d.workerId, list);
   }
+
+  const agencyMap = await representingAgencies(workerIds);
 
   const pending = shift.applications.filter((a) => a.status === "PENDING");
   const hired = shift.applications.filter((a) => a.status === "HIRED");
@@ -143,6 +146,7 @@ export default async function HRShiftPage({ params }: { params: { id: string } }
             {pending.map((a) => {
               const wDocs = docsByWorker.get(a.workerId) ?? [];
               const skills = a.worker.workerProfile?.skills.map((s) => s.position.name) ?? [];
+              const agencies = agencyMap.get(a.workerId) ?? [];
               return (
                 <li key={a.id} className="card">
                   <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
@@ -157,6 +161,9 @@ export default async function HRShiftPage({ params }: { params: { id: string } }
                             <div className="flex items-center gap-1 text-xs text-ink-500">
                               <MapPin className="w-3 h-3" /> {a.worker.workerProfile.address}
                             </div>
+                          )}
+                          {agencies.length > 0 && (
+                            <span className="badge-muted mt-1 inline-block">{agencyLabel(agencies)}</span>
                           )}
                         </div>
                       </div>
@@ -260,4 +267,8 @@ export default async function HRShiftPage({ params }: { params: { id: string } }
       )}
     </div>
   );
+}
+
+function agencyLabel(agencies: { id: string; name: string }[]) {
+  return `Представлен агентством «${agencies.map((a) => a.name).join(", ")}»`;
 }

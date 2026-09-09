@@ -4,6 +4,7 @@ import { MapPin, Wallet, Calendar, FileText } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatRub } from "@/lib/datetime";
+import { representingAgencies } from "@/lib/domain/representation";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
     orderBy: { createdAt: "desc" },
   });
 
+  const agencyMap = await representingAgencies(workers.map((w) => w.id));
+
   return (
     <div className="space-y-8">
       <div>
@@ -59,6 +62,7 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
           {workers.map((w) => {
             const skills = w.workerProfile?.skills.map((s) => s.position.name) ?? [];
             const docCount = w.workerProfile?.documents.length ?? 0;
+            const agencies = agencyMap.get(w.id) ?? [];
             return (
               <li key={w.id}>
                 <Link href={`/worker/${w.id}`} className="card-interactive block h-full cursor-pointer">
@@ -84,6 +88,12 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
                       {skills.length > 4 && (
                         <span className="text-xs text-ink-500">+{skills.length - 4}</span>
                       )}
+                    </div>
+                  )}
+
+                  {agencies.length > 0 && (
+                    <div className="mb-3">
+                      <span className="badge-muted">{agencyLabel(agencies)}</span>
                     </div>
                   )}
 
@@ -115,6 +125,10 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
       )}
     </div>
   );
+}
+
+function agencyLabel(agencies: { id: string; name: string }[]) {
+  return `Представлен агентством «${agencies.map((a) => a.name).join(", ")}»`;
 }
 
 function plural(n: number, one: string, few: string, many: string) {

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  ArrowLeft, MapPin, Wallet, Calendar, FileText, Phone, Mail, CheckCircle2,
+  ArrowLeft, MapPin, Wallet, Calendar, FileText, Phone, Mail, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { inviteWorker } from "./actions";
 import { shiftLabel, formatRub } from "@/lib/datetime";
+import { representingAgencies } from "@/lib/domain/representation";
 
 const kindLabel: Record<string, string> = {
   PASSPORT: "Паспорт",
@@ -19,7 +20,7 @@ export default async function WorkerPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { invited?: string };
+  searchParams: { invited?: string; error?: string };
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=HR");
@@ -58,6 +59,7 @@ export default async function WorkerPage({
   const availableShifts = myShifts.filter((s) => !existingShiftIds.has(s.id));
 
   const skills = worker.workerProfile.skills.map((s) => s.position.name);
+  const agencies = (await representingAgencies([worker.id])).get(worker.id) ?? [];
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -72,6 +74,13 @@ export default async function WorkerPage({
         </div>
       )}
 
+      {searchParams.error === "represented" && (
+        <div className="card !p-4 border-amber-200 bg-amber-50/60 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800">{representedNotice(agencies)}</p>
+        </div>
+      )}
+
       <article className="card">
         <div className="flex items-center gap-4 mb-4">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-ink-900 text-accent-400 text-xl font-semibold shrink-0">
@@ -83,6 +92,9 @@ export default async function WorkerPage({
               <div className="flex items-center gap-1.5 text-sm text-ink-500 mt-0.5">
                 <MapPin className="w-3.5 h-3.5" /> {worker.workerProfile.address}
               </div>
+            )}
+            {agencies.length > 0 && (
+              <span className="badge-muted mt-1.5 inline-block">{agencyLabel(agencies)}</span>
             )}
           </div>
         </div>
@@ -161,36 +173,42 @@ export default async function WorkerPage({
       <section className="card">
         <h2 className="section-title mb-4">Пригласить на смену</h2>
 
-        {availableShifts.length === 0 && existingApps.length > 0 && (
-          <p className="text-sm text-ink-500">
-            Все ваши открытые смены уже отправлены этому кандидату.
-          </p>
-        )}
-        {myShifts.length === 0 && (
-          <p className="text-sm text-ink-500">
-            У вас пока нет открытых смен. <Link href="/hr/shifts/new" className="text-ink-900 underline">Создать</Link>
-          </p>
-        )}
+        {agencies.length > 0 ? (
+          <p className="text-sm text-ink-500">{representedNotice(agencies)}</p>
+        ) : (
+          <>
+            {availableShifts.length === 0 && existingApps.length > 0 && (
+              <p className="text-sm text-ink-500">
+                Все ваши открытые смены уже отправлены этому кандидату.
+              </p>
+            )}
+            {myShifts.length === 0 && (
+              <p className="text-sm text-ink-500">
+                У вас пока нет открытых смен. <Link href="/hr/shifts/new" className="text-ink-900 underline">Создать</Link>
+              </p>
+            )}
 
-        {availableShifts.length > 0 && (
-          <form action={inviteWorker} className="space-y-4">
-            <input type="hidden" name="workerId" value={worker.id} />
-            <div>
-              <label className="label">Смена</label>
-              <select name="shiftId" className="input" required>
-                {availableShifts.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title} — {shiftLabel(s.shiftStart, s.shiftEnd)} — {formatRub(s.payment)} ₽
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Сообщение (опц.)</label>
-              <textarea name="message" className="input min-h-[60px]" placeholder="Что важно сказать кандидату..." />
-            </div>
-            <button className="btn-accent">Отправить приглашение</button>
-          </form>
+            {availableShifts.length > 0 && (
+              <form action={inviteWorker} className="space-y-4">
+                <input type="hidden" name="workerId" value={worker.id} />
+                <div>
+                  <label className="label">Смена</label>
+                  <select name="shiftId" className="input" required>
+                    {availableShifts.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.title} — {shiftLabel(s.shiftStart, s.shiftEnd)} — {formatRub(s.payment)} ₽
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Сообщение (опц.)</label>
+                  <textarea name="message" className="input min-h-[60px]" placeholder="Что важно сказать кандидату..." />
+                </div>
+                <button className="btn-accent">Отправить приглашение</button>
+              </form>
+            )}
+          </>
         )}
 
         {existingApps.length > 0 && (
@@ -217,6 +235,14 @@ export default async function WorkerPage({
       </section>
     </div>
   );
+}
+
+function agencyLabel(agencies: { id: string; name: string }[]) {
+  return `Представлен агентством «${agencies.map((a) => a.name).join(", ")}»`;
+}
+
+function representedNotice(agencies: { id: string; name: string }[]) {
+  return `${agencyLabel(agencies)}. Приглашение оформляется через агентство.`;
 }
 
 function statusLabel(a: { initiator: string; status: string }) {

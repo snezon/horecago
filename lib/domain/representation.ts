@@ -76,3 +76,30 @@ export async function activeAgencyIds(workerUserId: string) {
   });
   return rows.map((r) => r.agencyId);
 }
+
+/** Активные представительства пачкой: работник → список агентств. */
+export async function representingAgencies(workerUserIds: string[]) {
+  const result = new Map<string, { id: string; name: string }[]>();
+  if (workerUserIds.length === 0) return result;
+
+  const rows = await prisma.representation.findMany({
+    where: { workerId: { in: workerUserIds }, status: "ACTIVE" },
+    include: { agency: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  for (const row of rows) {
+    const list = result.get(row.workerId) ?? [];
+    list.push({ id: row.agency.id, name: row.agency.name });
+    result.set(row.workerId, list);
+  }
+  return result;
+}
+
+export async function isRepresented(workerUserId: string) {
+  const row = await prisma.representation.findFirst({
+    where: { workerId: workerUserId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
