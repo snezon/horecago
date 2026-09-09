@@ -5,9 +5,29 @@ import { useSearchParams } from "next/navigation";
 import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
+const ROLES = ["WORKER", "AGENCY", "CLIENT"] as const;
+type Role = (typeof ROLES)[number];
+
+const ROLE_LABELS: Record<Role, string> = {
+  WORKER: "Ищу работу",
+  AGENCY: "Кадровое агентство",
+  CLIENT: "Отель или ресторан",
+};
+
+const ROLE_TITLES: Record<Role, string> = {
+  WORKER: "Вход для соискателя",
+  AGENCY: "Вход для кадрового агентства",
+  CLIENT: "Вход для работодателя",
+};
+
+function normalizeInitialRole(raw: string | null): Role | null {
+  if (raw === "HR") return "CLIENT";
+  return (ROLES as readonly string[]).includes(raw ?? "") ? (raw as Role) : null;
+}
+
 export default function LoginPage() {
   const params = useSearchParams();
-  const role = params.get("role") === "HR" ? "HR" : params.get("role") === "WORKER" ? "WORKER" : null;
+  const [role, setRole] = useState<Role | null>(normalizeInitialRole(params.get("role")));
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState<{ url?: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -15,6 +35,10 @@ export default function LoginPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!role) {
+      setError("Выберите, кто вы");
+      return;
+    }
     setLoading(true);
     setError(null);
     const res = await fetch("/api/auth/login", {
@@ -64,12 +88,27 @@ export default function LoginPage() {
       </Link>
       <div className="card">
         <h1 className="text-2xl font-semibold mb-2">
-          {role === "HR" ? "Вход для работодателя" : role === "WORKER" ? "Вход для соискателя" : "Вход"}
+          {role ? ROLE_TITLES[role] : "Вход"}
         </h1>
         <p className="text-sm text-ink-600 mb-6">
           Введите email — пришлём ссылку для входа. Без паролей.
         </p>
         <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="label">Кто вы</label>
+            <div className="flex flex-wrap gap-2">
+              {ROLES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={role === r ? "chip-active" : "chip-default"}
+                >
+                  {ROLE_LABELS[r]}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <label className="label">Email</label>
             <div className="relative">
