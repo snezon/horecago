@@ -77,6 +77,24 @@ describe("inviteWorker", () => {
     expect(rep?.status).toBe("PENDING");
   });
 
+  it("приглашение по email владельца агентства не создаёт представительство", async () => {
+    const agency = await makeAgency("Кадры11");
+    await prisma.user.create({ data: { email: "agencyowner@example.com", role: "AGENCY" } });
+
+    await inviteWorker(agency.id, "agencyowner@example.com");
+
+    expect(await prisma.representation.count()).toBe(0);
+  });
+
+  it("приглашение по email заказчика (HR) не создаёт представительство", async () => {
+    const agency = await makeAgency("Кадры12");
+    await prisma.user.create({ data: { email: "hrowner@example.com", role: "HR" } });
+
+    await inviteWorker(agency.id, "hrowner@example.com");
+
+    expect(await prisma.representation.count()).toBe(0);
+  });
+
   it("повторное приглашение не сбрасывает подтверждённое представительство", async () => {
     const agency = await makeAgency("Кадры8");
     const worker = await makeWorker("confirmed@example.com");

@@ -17,8 +17,12 @@ export async function inviteWorker(agencyId: string, email: string) {
   // связь агентства с человеком, а не с анкетой.
   const user = await prisma.user.findUnique({ where: { email: normalized } });
 
+  // Представительство связывает агентство именно с работником: владельцу
+  // агентства или заказчику (роль AGENCY/HR) его завести нельзя, даже если
+  // email совпал с приглашённым. Письмо всё равно уходит — это просто вход,
+  // а не подтверждение связи.
   let representationId = "";
-  if (user) {
+  if (user && user.role === "WORKER") {
     const rep = await prisma.representation.upsert({
       where: { workerId_agencyId: { workerId: user.id, agencyId } },
       update: {},
