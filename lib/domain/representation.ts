@@ -12,14 +12,13 @@ export async function inviteWorker(agencyId: string, email: string) {
   const { url, token } = await createMagicLink(normalized, "WORKER", agencyId);
 
   // Если человек уже зарегистрирован — представительство заводим сразу,
-  // но в статусе PENDING: подтвердит он сам, перейдя по ссылке.
-  const user = await prisma.user.findUnique({
-    where: { email: normalized },
-    include: { workerProfile: true },
-  });
+  // но в статусе PENDING: подтвердит он сам, перейдя по ссылке. Анкета
+  // работника (WorkerProfile) для этого не нужна — представительство это
+  // связь агентства с человеком, а не с анкетой.
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
 
   let representationId = "";
-  if (user?.workerProfile) {
+  if (user) {
     const rep = await prisma.representation.upsert({
       where: { workerId_agencyId: { workerId: user.id, agencyId } },
       update: {},

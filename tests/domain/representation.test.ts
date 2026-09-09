@@ -21,6 +21,10 @@ async function makeWorker(email: string) {
   return user;
 }
 
+async function makeUserWithoutProfile(email: string) {
+  return prisma.user.create({ data: { email, role: "WORKER" } });
+}
+
 describe("inviteWorker", () => {
   beforeEach(resetDb);
 
@@ -54,6 +58,20 @@ describe("inviteWorker", () => {
     const rep = await prisma.representation.findUnique({
       where: {
         workerId_agencyId: { workerId: worker.id, agencyId: agency.id },
+      },
+    });
+    expect(rep?.status).toBe("PENDING");
+  });
+
+  it("создаёт представительство в статусе PENDING для существующего пользователя без профиля работника", async () => {
+    const agency = await makeAgency("Кадры9");
+    const user = await makeUserWithoutProfile("noprofile@example.com");
+
+    await inviteWorker(agency.id, "noprofile@example.com");
+
+    const rep = await prisma.representation.findUnique({
+      where: {
+        workerId_agencyId: { workerId: user.id, agencyId: agency.id },
       },
     });
     expect(rep?.status).toBe("PENDING");
@@ -103,6 +121,21 @@ describe("activateRepresentation", () => {
     await activateRepresentation(worker.id, agency.id);
 
     expect(await prisma.representation.count()).toBe(1);
+  });
+
+  it("работает для пользователя без WorkerProfile — регрессия на FK-падение при переходе по приглашению", async () => {
+    const agency = await makeAgency("Кадры10");
+    const user = await makeUserWithoutProfile("noprofile2@example.com");
+
+    await activateRepresentation(user.id, agency.id);
+
+    const rep = await prisma.representation.findUnique({
+      where: {
+        workerId_agencyId: { workerId: user.id, agencyId: agency.id },
+      },
+    });
+    expect(rep?.status).toBe("ACTIVE");
+    expect(rep?.activatedAt).toBeInstanceOf(Date);
   });
 });
 

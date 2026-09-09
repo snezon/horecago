@@ -15,12 +15,13 @@ model User {
   phone     String?
   createdAt DateTime @default(now())
 
-  hrProfile     HRProfile?
-  workerProfile WorkerProfile?
-  shifts        Shift[]
-  applications  Application[]
-  sessions      Session[]
-  memberships   Membership[]
+  hrProfile       HRProfile?
+  workerProfile   WorkerProfile?
+  shifts          Shift[]
+  applications    Application[]
+  sessions        Session[]
+  memberships     Membership[]
+  representations Representation[]
 }
 
 model Org {
@@ -66,7 +67,6 @@ model WorkerProfile {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   skills           WorkerSkill[]
   documents        Document[]
-  representations  Representation[]
 }
 
 model Position {
@@ -154,8 +154,8 @@ model Representation {
   activatedAt DateTime?
   revokedAt   DateTime?
 
-  worker WorkerProfile @relation(fields: [workerId], references: [userId], onDelete: Cascade)
-  agency Org           @relation("AgencyRepresentations", fields: [agencyId], references: [id], onDelete: Cascade)
+  worker User @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  agency Org  @relation("AgencyRepresentations", fields: [agencyId], references: [id], onDelete: Cascade)
 
   @@unique([workerId, agencyId])
   @@index([agencyId, status])
