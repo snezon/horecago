@@ -32,7 +32,8 @@ model Org {
   verified  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  memberships Membership[]
+  memberships     Membership[]
+  representations Representation[] @relation("AgencyRepresentations")
 }
 
 model Membership {
@@ -65,6 +66,7 @@ model WorkerProfile {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   skills           WorkerSkill[]
   documents        Document[]
+  representations  Representation[]
 }
 
 model Position {
@@ -137,9 +139,26 @@ model MagicLink {
   email     String
   token     String   @unique
   role      String?  // role hint at signup time
+  agencyId  String?
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model Representation {
+  id          String    @id @default(cuid())
+  workerId    String
+  agencyId    String
+  status      String    @default("PENDING") // "PENDING" | "ACTIVE" | "REVOKED"
+  createdAt   DateTime  @default(now())
+  activatedAt DateTime?
+  revokedAt   DateTime?
+
+  worker WorkerProfile @relation(fields: [workerId], references: [userId], onDelete: Cascade)
+  agency Org           @relation("AgencyRepresentations", fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, agencyId])
+  @@index([agencyId, status])
 }
 
 model Session {
