@@ -37,6 +37,7 @@ model Org {
 
   memberships     Membership[]
   representations Representation[] @relation("AgencyRepresentations")
+  invites         AgencyInvite[]   @relation("AgencyInvites")
 }
 
 model Membership {
@@ -161,6 +162,23 @@ model Representation {
 
   @@unique([workerId, agencyId])
   @@index([agencyId, status])
+}
+
+model AgencyInvite {
+  id             String    @id @default(cuid())
+  agencyId       String
+  email          String
+  status         String    @default("PENDING") // "PENDING" | "ACCEPTED" | "CANCELLED"
+  deliveryStatus String    @default("SENT")    // "SENT" | "FAILED"
+  deliveryError  String?
+  createdAt      DateTime  @default(now())
+  acceptedAt     DateTime?
+
+  agency Org @relation("AgencyInvites", fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, email])
+  @@index([email, status])
+  @@index([agencyId, createdAt])
 }
 
 model Session {

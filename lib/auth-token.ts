@@ -2,10 +2,17 @@ import { randomBytes } from "crypto";
 import { prisma } from "./db";
 import { sendEmail } from "./email";
 
-const MAGIC_TTL_MIN = 15;
+const LOGIN_TTL_MIN = 60;
+// Приглашение агентства живёт неделю: аудитория смотрит почту в перерыв или
+// вечером, обычных 60 минут не хватает — иначе агентство теряет человека.
+export const INVITE_TTL_MIN = 60 * 24 * 7;
 
 export function generateToken() {
   return randomBytes(32).toString("hex");
+}
+
+function ttlLabel(ttlMinutes: number) {
+  return ttlMinutes > 60 * 24 ? "7 дней" : "60 минут";
 }
 
 // "HR" остаётся в объединении, пока Task 5 не переведёт вызовы на "CLIENT":
@@ -14,9 +21,10 @@ export async function createMagicLink(
   email: string,
   role?: "WORKER" | "AGENCY" | "CLIENT" | "HR",
   agencyId?: string,
+  ttlMinutes: number = LOGIN_TTL_MIN,
 ) {
   const token = generateToken();
-  const expiresAt = new Date(Date.now() + MAGIC_TTL_MIN * 60_000);
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
   await prisma.magicLink.create({
     data: {
       email: email.toLowerCase().trim(),
@@ -29,7 +37,7 @@ export async function createMagicLink(
   const url = `${process.env.APP_URL ?? "http://localhost:3100"}/auth/verify?token=${token}`;
   const html = `
     <p>Здравствуйте,</p>
-    <p>Чтобы войти в HoReCaGo, перейдите по ссылке (действует 15 минут):</p>
+    <p>Чтобы войти в HoReCaGo, перейдите по ссылке (действует ${ttlLabel(ttlMinutes)}):</p>
     <p><a href="${url}">${url}</a></p>
     <p>Если вы не запрашивали ссылку — просто проигнорируйте письмо.</p>
   `;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { consumeMagicLink, createSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { resolveSignupTarget } from "@/lib/domain/signup";
-import { activateRepresentation } from "@/lib/domain/representation";
+import { acceptPendingInvites } from "@/lib/domain/representation";
 
 /** Роль ссылки → роль пользователя. "HR" остаётся до переезда экранов в фазе 1. */
 function userRoleFor(linkRole: string | null): string {
@@ -35,10 +35,10 @@ export async function GET(req: NextRequest) {
 
   await createSession(user.id);
 
-  // Человек перешёл по ссылке приглашения — этим он сам подтвердил связь с агентством.
-  if (link.agencyId && link.role === "WORKER") {
-    await activateRepresentation(user.id, link.agencyId);
-  }
+  // Приглашение — самостоятельная запись в базе, а не состояние ссылки:
+  // принимаем все ожидающие приглашения на этот адрес при любом входе, а не
+  // только когда человек перешёл именно по ссылке приглашения.
+  await acceptPendingInvites(user.id, user.email);
 
   const target = resolveSignupTarget(
     { role: link.role, agencyId: link.agencyId },

@@ -1,20 +1,35 @@
 import { prisma } from "@/lib/db";
-import { createMagicLink } from "@/lib/auth-token";
+import { createMagicLink, INVITE_TTL_MIN } from "@/lib/auth-token";
 
 /**
  * Агентство приглашает работника. Учётную запись за человека мы не заводим:
  * передача нам его контактов третьей стороной без согласия запрещена (152-ФЗ).
  * Поэтому агентство отправляет приглашение, а профиль создаёт сам работник.
+ *
+ * Приглашение живёт в базе, а не только внутри ссылки: если письмо потеряется
+ * или ссылка (7 дней) истечёт, связь с агентством всё равно подхватится при
+ * входе — см. acceptPendingInvites.
  */
 export async function inviteWorker(agencyId: string, email: string) {
   const normalized = email.toLowerCase().trim();
 
-  const { url, token } = await createMagicLink(normalized, "WORKER", agencyId);
+  const invite = await prisma.agencyInvite.upsert({
+    where: { agencyId_email: { agencyId, email: normalized } },
+    update: {},
+    create: { agencyId, email: normalized, status: "PENDING" },
+  });
+
+  const { url, token } = await createMagicLink(
+    normalized,
+    "WORKER",
+    agencyId,
+    INVITE_TTL_MIN,
+  );
 
   // Если человек уже зарегистрирован — представительство заводим сразу,
-  // но в статусе PENDING: подтвердит он сам, перейдя по ссылке. Анкета
-  // работника (WorkerProfile) для этого не нужна — представительство это
-  // связь агентства с человеком, а не с анкетой.
+  // но в статусе PENDING: подтвердит он сам, перейдя по ссылке или войдя
+  // любым другим способом. Анкета работника (WorkerProfile) для этого не
+  // нужна — представительство это связь агентства с человеком, а не с анкетой.
   const user = await prisma.user.findUnique({ where: { email: normalized } });
 
   // Представительство связывает агентство именно с работником: владельцу
@@ -31,7 +46,34 @@ export async function inviteWorker(agencyId: string, email: string) {
     representationId = rep.id;
   }
 
-  return { representationId, url, token };
+  return { inviteId: invite.id, representationId, url, token };
+}
+
+/**
+ * Принимает все ожидающие приглашения на этот адрес. Вызывается при каждом
+ * входе (а не только при переходе по ссылке приглашения), поэтому связь с
+ * агентством подхватывается, даже если ссылка истекла и человек зашёл сам.
+ */
+export async function acceptPendingInvites(userId: string, email: string) {
+  const normalized = email.toLowerCase().trim();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!user || user.role !== "WORKER") return 0;
+
+  const invites = await prisma.agencyInvite.findMany({
+    where: { email: normalized, status: "PENDING" },
+  });
+
+  for (const invite of invites) {
+    await activateRepresentation(userId, invite.agencyId);
+    await prisma.agencyInvite.update({
+      where: { id: invite.id },
+      data: { status: "ACCEPTED", acceptedAt: new Date() },
+    });
+  }
+  return invites.length;
 }
 
 /**

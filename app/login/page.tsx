@@ -69,7 +69,7 @@ export default function LoginPage() {
           <h1 className="text-xl font-semibold mb-2">Ссылка отправлена</h1>
           <p className="text-sm text-ink-600 mb-1">Проверьте почту</p>
           <p className="text-sm font-medium text-ink-900 mb-6">{email}</p>
-          <p className="text-xs text-ink-500">Ссылка действительна 15 минут.</p>
+          <p className="text-xs text-ink-500">Ссылка действительна 60 минут.</p>
           {sent.url && (
             <div className="mt-5 p-3 rounded-lg bg-accent-50 border border-accent-200/50 text-left">
               <div className="text-xs font-semibold text-accent-700 mb-1">DEV: магическая ссылка</div>

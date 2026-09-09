@@ -4,6 +4,7 @@ export { prisma };
 
 export async function resetDb() {
   await prisma.representation.deleteMany();
+  await prisma.agencyInvite.deleteMany();
   await prisma.application.deleteMany();
   await prisma.shift.deleteMany();
   await prisma.document.deleteMany();
