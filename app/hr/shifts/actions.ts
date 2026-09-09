@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { hireApplication } from "@/lib/domain/hiring";
 
 function parseLocalDate(value: FormDataEntryValue | null): Date {
   const s = String(value ?? "");
@@ -65,24 +66,13 @@ export async function updateShift(formData: FormData) {
 export async function hireApplicant(formData: FormData) {
   const user = await requireUser();
   const appId = String(formData.get("appId"));
-  const app = await prisma.application.findUnique({
-    where: { id: appId },
-    include: { shift: true },
-  });
-  if (!app || app.shift.hrId !== user.id) return;
-  if (app.status !== "PENDING") return;
-  if (app.shift.status === "CLOSED") return;
+  const app = await prisma.application.findUnique({ where: { id: appId } });
+  if (!app) return;
 
-  const newHired = app.shift.hiredCount + 1;
-  const closing = newHired >= app.shift.headcount;
-
-  await prisma.$transaction([
-    prisma.application.update({ where: { id: appId }, data: { status: "HIRED" } }),
-    prisma.shift.update({
-      where: { id: app.shiftId },
-      data: { hiredCount: newHired, status: closing ? "CLOSED" : "OPEN" },
-    }),
-  ]);
+  const result = await hireApplication(appId, user.id);
+  if (result === "NO_SEATS") {
+    redirect(`/hr/shifts/${app.shiftId}?error=no_seats`);
+  }
   revalidatePath(`/hr/shifts/${app.shiftId}`);
 }
 

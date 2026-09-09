@@ -3,30 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { hireApplication } from "@/lib/domain/hiring";
 
 export async function acceptInvitation(formData: FormData) {
   const user = await requireUser();
   if (user.role !== "WORKER") return;
 
   const appId = String(formData.get("appId"));
-  const app = await prisma.application.findUnique({
-    where: { id: appId },
-    include: { shift: true },
-  });
+  const app = await prisma.application.findUnique({ where: { id: appId } });
   if (!app || app.workerId !== user.id) return;
   if (app.initiator !== "HR" || app.status !== "PENDING") return;
-  if (app.shift.status === "CLOSED") return;
 
-  const newHired = app.shift.hiredCount + 1;
-  const closing = newHired >= app.shift.headcount;
-
-  await prisma.$transaction([
-    prisma.application.update({ where: { id: appId }, data: { status: "HIRED" } }),
-    prisma.shift.update({
-      where: { id: app.shiftId },
-      data: { hiredCount: newHired, status: closing ? "CLOSED" : "OPEN" },
-    }),
-  ]);
+  await hireApplication(appId);
   revalidatePath("/applications");
 }
 

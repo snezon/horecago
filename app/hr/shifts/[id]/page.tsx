@@ -16,7 +16,13 @@ const kindLabel: Record<string, string> = {
   OTHER: "Другое",
 };
 
-export default async function HRShiftPage({ params }: { params: { id: string } }) {
+export default async function HRShiftPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { error?: string };
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=HR");
   if (user.role !== "HR") redirect("/");
@@ -63,6 +69,12 @@ export default async function HRShiftPage({ params }: { params: { id: string } }
       <Link href="/hr" className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900">
         <ArrowLeft className="w-4 h-4" /> К дашборду
       </Link>
+
+      {searchParams.error === "no_seats" && (
+        <div className="card !bg-amber-50 !border-amber-200 text-sm text-amber-800">
+          Мест не осталось: кого-то уже наняли на последнее место раньше вас.
+        </div>
+      )}
 
       <article className="card">
         <div className="flex items-start justify-between gap-4 flex-wrap mb-4">

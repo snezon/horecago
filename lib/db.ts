@@ -16,4 +16,9 @@ if (!globalForPrisma.walEnabled) {
   prisma.$executeRawUnsafe("PRAGMA journal_mode=WAL;").catch((e) => {
     console.error("Не удалось включить WAL:", e);
   });
+  // При конкурентной записи (условные updateMany в найме) SQLite может быть
+  // занят долю секунды — ждём вместо мгновенной ошибки SQLITE_BUSY.
+  prisma.$executeRawUnsafe("PRAGMA busy_timeout=5000;").catch((e) => {
+    console.error("Не удалось задать busy_timeout:", e);
+  });
 }
