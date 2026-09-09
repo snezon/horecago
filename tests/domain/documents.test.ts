@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
-import { createOrg } from "@/lib/domain/orgs";
-import { activateRepresentation } from "@/lib/domain/representation";
+import { createOrg, addMember } from "@/lib/domain/orgs";
+import { activateRepresentation, revokeRepresentation } from "@/lib/domain/representation";
 import { canViewDocumentUrl } from "@/lib/domain/documents";
 
 const URL = "/uploads/abc123.pdf";
@@ -88,5 +88,48 @@ describe("canViewDocumentUrl", () => {
   it("для несуществующего документа возвращает false", async () => {
     const worker = await makeWorkerWithDoc();
     expect(await canViewDocumentUrl(worker.id, "/uploads/нет.pdf")).toBe(false);
+  });
+
+  it("сотрудник агентства, не владелец, документ видит", async () => {
+    const worker = await makeWorkerWithDoc();
+    const owner = await prisma.user.create({
+      data: { email: "owner2@example.com", role: "AGENCY" },
+    });
+    const manager = await prisma.user.create({
+      data: { email: "manager@example.com", role: "AGENCY" },
+    });
+    const agency = await createOrg({
+      type: "AGENCY", name: "Кадры-2", ownerUserId: owner.id,
+    });
+    await addMember(agency.id, manager.id, "MANAGER");
+    await activateRepresentation(worker.id, agency.id);
+    expect(await canViewDocumentUrl(manager.id, URL)).toBe(true);
+  });
+
+  it("представительство в статусе PENDING доступа не даёт", async () => {
+    const worker = await makeWorkerWithDoc();
+    const owner = await prisma.user.create({
+      data: { email: "owner3@example.com", role: "AGENCY" },
+    });
+    const agency = await createOrg({
+      type: "AGENCY", name: "Кадры-3", ownerUserId: owner.id,
+    });
+    await prisma.representation.create({
+      data: { workerId: worker.id, agencyId: agency.id, status: "PENDING" },
+    });
+    expect(await canViewDocumentUrl(owner.id, URL)).toBe(false);
+  });
+
+  it("отозванное представительство доступа не даёт", async () => {
+    const worker = await makeWorkerWithDoc();
+    const owner = await prisma.user.create({
+      data: { email: "owner4@example.com", role: "AGENCY" },
+    });
+    const agency = await createOrg({
+      type: "AGENCY", name: "Кадры-4", ownerUserId: owner.id,
+    });
+    await activateRepresentation(worker.id, agency.id);
+    await revokeRepresentation(worker.id, agency.id);
+    expect(await canViewDocumentUrl(owner.id, URL)).toBe(false);
   });
 });
