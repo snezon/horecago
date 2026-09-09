@@ -3,7 +3,8 @@ import { AlertTriangle, UserPlus } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { agencyIdsOf } from "@/lib/domain/access";
-import { sendWorkerInvite } from "./actions";
+import { MAX_INVITES_PER_BATCH } from "@/lib/domain/emails";
+import { sendWorkerInvites } from "./actions";
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Ждём подтверждения",
@@ -17,7 +18,16 @@ const STATUS_BADGE: Record<string, string> = {
   REVOKED: "badge-muted",
 };
 
-export default async function AgencyDashboardPage() {
+function parseCount(raw: string | string[] | undefined): number {
+  const n = Number(Array.isArray(raw) ? raw[0] : raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+export default async function AgencyDashboardPage({
+  searchParams,
+}: {
+  searchParams: { sent?: string; failed?: string; invalid?: string; skipped?: string };
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=AGENCY");
   if (user.role !== "AGENCY") redirect("/");
@@ -33,6 +43,17 @@ export default async function AgencyDashboardPage() {
     include: { worker: true },
     orderBy: { createdAt: "desc" },
   });
+
+  const invites = await prisma.agencyInvite.findMany({
+    where: { agencyId, email: { in: reps.map((r) => r.worker.email) } },
+  });
+  const inviteByEmail = new Map(invites.map((i) => [i.email, i]));
+
+  const sent = parseCount(searchParams.sent);
+  const failed = parseCount(searchParams.failed);
+  const invalid = parseCount(searchParams.invalid);
+  const skipped = parseCount(searchParams.skipped);
+  const hasSummary = sent + failed + invalid + skipped > 0;
 
   return (
     <div className="space-y-8">
@@ -52,11 +73,34 @@ export default async function AgencyDashboardPage() {
       )}
 
       <section className="card space-y-4">
-        <h2 className="section-title">Пригласить работника</h2>
-        <form action={sendWorkerInvite} className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[220px]">
-            <label className="label">Email работника</label>
-            <input name="email" type="email" className="input" required placeholder="ivan@example.com" />
+        <h2 className="section-title">Пригласить работников</h2>
+        {hasSummary && (
+          <div className="text-sm rounded-lg bg-ink-50 border border-ink-100 px-4 py-3 space-y-0.5">
+            {sent > 0 && <p className="text-emerald-700">Отправлено: {sent}</p>}
+            {failed > 0 && <p className="text-red-600">Не удалось отправить: {failed}</p>}
+            {invalid > 0 && (
+              <p className="text-amber-700">Не похоже на адрес и пропущено: {invalid}</p>
+            )}
+            {skipped > 0 && (
+              <p className="text-ink-600">
+                Не поместилось в пачку (лимит {MAX_INVITES_PER_BATCH} за раз): {skipped}.
+                Отправьте их следующим разом.
+              </p>
+            )}
+          </div>
+        )}
+        <form action={sendWorkerInvites} className="space-y-3">
+          <div>
+            <label className="label">Адреса работников</label>
+            <textarea
+              name="emails"
+              className="input min-h-[120px]"
+              required
+              placeholder={"ivan@example.com\nmaria@example.com"}
+            />
+            <p className="text-xs text-ink-500 mt-1">
+              По одному адресу в строке, до {MAX_INVITES_PER_BATCH} за раз.
+            </p>
           </div>
           <button className="btn-primary !px-5 !py-2.5">
             <UserPlus className="w-4 h-4" />
@@ -82,23 +126,40 @@ export default async function AgencyDashboardPage() {
                 <tr className="text-left text-xs uppercase tracking-wide text-ink-500 border-b border-ink-100">
                   <th className="px-4 py-3 font-medium">Работник</th>
                   <th className="px-4 py-3 font-medium">Статус</th>
+                  <th className="px-4 py-3 font-medium">Письмо</th>
                   <th className="px-4 py-3 font-medium">Дата</th>
                 </tr>
               </thead>
               <tbody>
-                {reps.map((rep) => (
-                  <tr key={rep.id} className="border-b border-ink-100 last:border-0">
-                    <td className="px-4 py-3 text-ink-900">{rep.worker.name || rep.worker.email}</td>
-                    <td className="px-4 py-3">
-                      <span className={STATUS_BADGE[rep.status] ?? "badge-neutral"}>
-                        {STATUS_LABELS[rep.status] ?? rep.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-ink-500">
-                      {rep.createdAt.toLocaleDateString("ru-RU")}
-                    </td>
-                  </tr>
-                ))}
+                {reps.map((rep) => {
+                  const invite = inviteByEmail.get(rep.worker.email);
+                  const deliveryFailed = invite?.deliveryStatus === "FAILED";
+                  return (
+                    <tr key={rep.id} className="border-b border-ink-100 last:border-0">
+                      <td className="px-4 py-3 text-ink-900">{rep.worker.name || rep.worker.email}</td>
+                      <td className="px-4 py-3">
+                        <span className={STATUS_BADGE[rep.status] ?? "badge-neutral"}>
+                          {STATUS_LABELS[rep.status] ?? rep.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {deliveryFailed ? (
+                          <span
+                            className="badge-warning cursor-help"
+                            title={invite?.deliveryError ?? "неизвестная ошибка"}
+                          >
+                            Письмо не доставлено
+                          </span>
+                        ) : (
+                          <span className="text-ink-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-ink-500">
+                        {rep.createdAt.toLocaleDateString("ru-RU")}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

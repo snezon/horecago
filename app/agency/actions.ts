@@ -1,18 +1,36 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { agencyIdsOf } from "@/lib/domain/access";
 import { inviteWorker } from "@/lib/domain/representation";
+import { parseEmailList, MAX_INVITES_PER_BATCH } from "@/lib/domain/emails";
 
-export async function sendWorkerInvite(formData: FormData) {
+/**
+ * Отправка синхронная внутри запроса — сотня писем упрётся в таймаут,
+ * поэтому пачка ограничена. Лишние адреса не теряются молча: агентству
+ * показывается, сколько не поместилось, чтобы отправить их следующей пачкой.
+ */
+export async function sendWorkerInvites(formData: FormData) {
   const user = await requireUser();
   const [agencyId] = await agencyIdsOf(user.id);
   if (!agencyId) return;
 
-  const email = String(formData.get("email") ?? "").trim();
-  if (!email) return;
+  const { emails, invalid } = parseEmailList(String(formData.get("emails") ?? ""));
+  const list = emails.slice(0, MAX_INVITES_PER_BATCH);
 
-  await inviteWorker(agencyId, email);
+  let sent = 0;
+  let failed = 0;
+  for (const email of list) {
+    const result = await inviteWorker(agencyId, email);
+    if (result.delivery.ok) sent++;
+    else failed++;
+  }
+
+  const skipped = emails.length - list.length;
   revalidatePath("/agency");
+  redirect(
+    `/agency?sent=${sent}&failed=${failed}&invalid=${invalid.length}&skipped=${skipped}`,
+  );
 }

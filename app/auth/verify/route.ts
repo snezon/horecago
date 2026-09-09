@@ -15,9 +15,10 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.redirect(new URL("/login", req.url));
 
-  const link = await consumeMagicLink(token);
+  const { link, reason } = await consumeMagicLink(token);
   if (!link) {
-    return NextResponse.redirect(new URL("/login?error=expired", req.url));
+    const error = reason === "used" ? "used" : "expired";
+    return NextResponse.redirect(new URL(`/login?error=${error}`, req.url));
   }
 
   let user = await prisma.user.findUnique({

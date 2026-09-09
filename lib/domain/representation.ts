@@ -25,12 +25,20 @@ export async function inviteWorker(agencyId: string, email: string) {
     create: { agencyId, email: normalized, status: "PENDING" },
   });
 
-  const { url, token } = await createMagicLink(
+  const { url, token, delivery } = await createMagicLink(
     normalized,
     "WORKER",
     agencyId,
     INVITE_TTL_MIN,
   );
+
+  await prisma.agencyInvite.update({
+    where: { id: invite.id },
+    data: {
+      deliveryStatus: delivery.ok ? "SENT" : "FAILED",
+      deliveryError: delivery.ok ? null : (delivery.error ?? "неизвестная ошибка"),
+    },
+  });
 
   // Если человек уже зарегистрирован — представительство заводим сразу,
   // но в статусе PENDING: подтвердит он сам, перейдя по ссылке или войдя
@@ -52,7 +60,7 @@ export async function inviteWorker(agencyId: string, email: string) {
     representationId = rep.id;
   }
 
-  return { inviteId: invite.id, representationId, url, token };
+  return { inviteId: invite.id, representationId, url, token, delivery };
 }
 
 /**

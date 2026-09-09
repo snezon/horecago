@@ -11,7 +11,10 @@ export async function POST(req: NextRequest) {
     raw === "HR" ? "CLIENT" :
     raw === "AGENCY" || raw === "CLIENT" || raw === "WORKER" ? raw :
     undefined;
-  const { url } = await createMagicLink(email, validRole);
+  const { url, delivery } = await createMagicLink(email, validRole);
+  if (!delivery.ok) {
+    return NextResponse.json({ error: "mail" }, { status: 502 });
+  }
   // In dev (no SMTP): return URL so it shows in UI; in prod hide it.
   return NextResponse.json({ ok: true, url: process.env.SMTP_HOST ? undefined : url });
 }

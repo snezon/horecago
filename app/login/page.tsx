@@ -25,13 +25,24 @@ function normalizeInitialRole(raw: string | null): Role | null {
   return (ROLES as readonly string[]).includes(raw ?? "") ? (raw as Role) : null;
 }
 
+const ERROR_MESSAGES: Record<string, string> = {
+  expired: "Ссылка устарела. Введите почту ещё раз, мы пришлём новую.",
+  used: "Ссылка уже использована. Введите почту ещё раз.",
+  mail: "Не удалось отправить письмо. Попробуйте ещё раз через минуту.",
+};
+
+function errorMessage(code: string | null): string | null {
+  if (!code) return null;
+  return ERROR_MESSAGES[code] ?? null;
+}
+
 export default function LoginPage() {
   const params = useSearchParams();
   const [role, setRole] = useState<Role | null>(normalizeInitialRole(params.get("role")));
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState<{ url?: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(errorMessage(params.get("error")));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +60,7 @@ export default function LoginPage() {
     setLoading(false);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setError(j.error ?? "Ошибка");
+      setError(errorMessage(j.error) ?? j.error ?? "Ошибка");
       return;
     }
     const j = await res.json();

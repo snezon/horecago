@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import type { MagicLink } from "@prisma/client";
 import { prisma } from "./db";
 import { sendEmail } from "./email";
 
@@ -41,19 +42,29 @@ export async function createMagicLink(
     <p><a href="${url}">${url}</a></p>
     <p>Если вы не запрашивали ссылку — просто проигнорируйте письмо.</p>
   `;
-  await sendEmail(email, "Вход в HoReCaGo", html, `Войти: ${url}`);
+  const delivery = await sendEmail(email, "Вход в HoReCaGo", html, `Войти: ${url}`);
   if (!process.env.SMTP_HOST) {
     console.log("\n=== MAGIC LINK ===");
     console.log(`To: ${email}`);
     console.log(`URL: ${url}`);
     console.log("==================\n");
   }
-  return { token, url };
+  return { token, url, delivery };
 }
 
-export async function consumeMagicLink(token: string) {
+type ConsumeResult =
+  | { link: MagicLink; reason: null }
+  | { link: null; reason: "expired" | "used" | "unknown" };
+
+/**
+ * Отличает «ссылки такой нет / истекла» от «уже использована» — на странице
+ * входа это два разных сообщения, а не одна общая пустота.
+ */
+export async function consumeMagicLink(token: string): Promise<ConsumeResult> {
   const link = await prisma.magicLink.findUnique({ where: { token } });
-  if (!link || link.used || link.expiresAt < new Date()) return null;
+  if (!link) return { link: null, reason: "unknown" };
+  if (link.used) return { link: null, reason: "used" };
+  if (link.expiresAt < new Date()) return { link: null, reason: "expired" };
   await prisma.magicLink.update({ where: { token }, data: { used: true } });
-  return link;
+  return { link, reason: null };
 }

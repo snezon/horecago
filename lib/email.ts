@@ -18,7 +18,12 @@ function getTransport(): Transporter | null {
   return cached;
 }
 
-export async function sendEmail(to: string, subject: string, html: string, text?: string) {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  text?: string,
+): Promise<{ ok: boolean; error?: string }> {
   const transport = getTransport();
   const from = process.env.SMTP_FROM ?? "noreply@horecago.ru";
   if (!transport) {
@@ -28,7 +33,13 @@ export async function sendEmail(to: string, subject: string, html: string, text?
     console.log(`Subject: ${subject}`);
     console.log(text ?? html);
     console.log("============================\n");
-    return;
+    return { ok: true };
   }
-  await transport.sendMail({ from, to, subject, html, text });
+  try {
+    await transport.sendMail({ from, to, subject, html, text });
+    return { ok: true };
+  } catch (e) {
+    console.error("Не удалось отправить письмо:", to, e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
