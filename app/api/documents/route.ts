@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { hasConsent } from "@/lib/domain/consent";
 import { canUploadFor } from "@/lib/domain/documents";
+import { parseLocalDateInput } from "@/lib/datetime";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -53,11 +54,14 @@ export async function POST(req: NextRequest) {
 
   let expiresAt: Date | null = null;
   if (expiresAtStr) {
-    const parsed = new Date(expiresAtStr);
-    if (Number.isNaN(parsed.getTime())) {
+    // Разбираем вручную как локальную полночь, а не через new Date(str) —
+    // иначе "ГГГГ-ММ-ДД" уйдёт в UTC-полночь, а shiftStart сравнивается в
+    // локальном времени процесса, и сравнение по дню поплывёт при смене
+    // часового пояса сервера. См. lib/datetime.ts.
+    expiresAt = parseLocalDateInput(expiresAtStr);
+    if (!expiresAt) {
       return NextResponse.json({ error: "Некорректная дата окончания срока" }, { status: 400 });
     }
-    expiresAt = parsed;
   }
 
   const file = form.get("file") as File | null;

@@ -19,6 +19,75 @@ const kindLabel: Record<string, string> = {
   OTHER: "Другое",
 };
 
+type CandidateDocument = {
+  id: string;
+  kind: string;
+  url: string;
+  expiresAt: Date | null;
+};
+
+/**
+ * Документы кандидата с предупреждением о сроке — общий кусок для «Новых
+ * заявок» и «Подтверждённых», чтобы формулировки (и логика сравнения со
+ * сменой) не разъехались между секциями. У подтверждённого кандидата
+ * (`urgent`) предупреждение заметнее: этот человек уже нанят и должен
+ * выйти на объект, риск штрафа Роспотребнадзора именно здесь.
+ */
+function CandidateDocuments({
+  docs,
+  shiftStart,
+  urgent = false,
+}: {
+  docs: CandidateDocument[];
+  shiftStart: Date;
+  urgent?: boolean;
+}) {
+  if (docs.length === 0) return null;
+
+  const hasExpired = docs.some((d) => isExpiredForShift(d.expiresAt, shiftStart));
+
+  return (
+    <div className="pt-3 border-t border-ink-200/70">
+      {urgent && hasExpired && (
+        <div className="mb-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-100 border-2 border-red-400 text-red-900">
+          <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+          <p className="text-sm font-semibold leading-snug">
+            Документ истекает до даты смены — человек уже подтверждён, нужно среагировать заранее.
+          </p>
+        </div>
+      )}
+      <div className="text-xs uppercase tracking-wide text-ink-500 mb-2">Документы</div>
+      <ul className="flex flex-wrap gap-2">
+        {docs.map((d) => {
+          const expired = isExpiredForShift(d.expiresAt, shiftStart);
+          return (
+            <li key={d.id} className="flex flex-col gap-1">
+              <a
+                href={d.url}
+                target="_blank"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm hover:bg-white ${expired ? "bg-red-50 border-red-300 text-red-800 hover:border-red-400" : "bg-ink-50 border-ink-200 text-ink-700 hover:border-ink-400"}`}
+              >
+                <FileText className={`w-3.5 h-3.5 ${expired ? "text-red-500" : "text-ink-400"}`} />
+                {kindLabel[d.kind] ?? d.kind}
+                {d.expiresAt && <span className="text-xs opacity-80">до {d.expiresAt.toLocaleDateString("ru-RU")}</span>}
+              </a>
+              {expired && !urgent && (
+                <span className="inline-flex items-center gap-1 text-xs text-red-700 font-medium">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Срок истекает до даты смены
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-xs text-ink-400 mt-2">
+        Срок указан работником или агентством, площадка его не проверяла.
+      </p>
+    </div>
+  );
+}
+
 export default async function HRShiftPage({
   params,
   searchParams,
@@ -228,34 +297,7 @@ export default async function HRShiftPage({
                     </div>
                   )}
 
-                  {wDocs.length > 0 && (
-                    <div className="pt-3 border-t border-ink-200/70">
-                      <div className="text-xs uppercase tracking-wide text-ink-500 mb-2">Документы</div>
-                      <ul className="flex flex-wrap gap-2">
-                        {wDocs.map((d) => {
-                          const expired = isExpiredForShift(d.expiresAt, shift.shiftStart);
-                          return (
-                            <li key={d.id} className="flex flex-col gap-1">
-                              <a href={d.url} target="_blank" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm hover:bg-white ${expired ? "bg-red-50 border-red-300 text-red-800 hover:border-red-400" : "bg-ink-50 border-ink-200 text-ink-700 hover:border-ink-400"}`}>
-                                <FileText className={`w-3.5 h-3.5 ${expired ? "text-red-500" : "text-ink-400"}`} />
-                                {kindLabel[d.kind] ?? d.kind}
-                                {d.expiresAt && <span className="text-xs opacity-80">до {d.expiresAt.toLocaleDateString("ru-RU")}</span>}
-                              </a>
-                              {expired && (
-                                <span className="inline-flex items-center gap-1 text-xs text-red-700 font-medium">
-                                  <AlertTriangle className="w-3.5 h-3.5" />
-                                  Срок истекает до даты смены
-                                </span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      <p className="text-xs text-ink-400 mt-2">
-                        Срок указан работником или агентством, площадка его не проверяла.
-                      </p>
-                    </div>
-                  )}
+                  <CandidateDocuments docs={wDocs} shiftStart={shift.shiftStart} />
                 </li>
               );
             })}
@@ -270,19 +312,23 @@ export default async function HRShiftPage({
             <span className="text-sm text-ink-500">{hired.length}</span>
           </div>
           <ul className="grid sm:grid-cols-2 gap-3">
-            {hired.map((a) => (
-              <li key={a.id} className="card !p-4">
-                <div className="flex items-center gap-3">
-                  <div className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 shrink-0">
-                    <CheckCircle2 className="w-4 h-4" />
+            {hired.map((a) => {
+              const wDocs = docsByWorker.get(a.workerId) ?? [];
+              return (
+                <li key={a.id} className="card !p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{a.worker.name}</div>
+                      <div className="text-xs text-ink-500">{a.worker.phone}</div>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm truncate">{a.worker.name}</div>
-                    <div className="text-xs text-ink-500">{a.worker.phone}</div>
-                  </div>
-                </div>
-              </li>
-            ))}
+                  <CandidateDocuments docs={wDocs} shiftStart={shift.shiftStart} urgent />
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

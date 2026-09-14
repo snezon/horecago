@@ -50,3 +50,33 @@ export function toLocalInput(d: Date): string {
 export function formatRub(n: number): string {
   return n.toLocaleString("ru-RU");
 }
+
+const DATE_INPUT_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Разбирает значение <input type="date"> ("ГГГГ-ММ-ДД") как локальную
+ * полночь. По умолчанию `new Date("2027-03-12")` разбирает такую строку как
+ * полночь по UTC, а не по локальному времени — в отличие от
+ * <input type="datetime-local">, который браузер и `new Date()` уже
+ * трактуют как локальное время. Если оставить как есть, срок документа и
+ * дата смены (shiftStart) оказываются в разных системах отсчёта, и
+ * сравнение по дню плывёт на сутки при отличном от UTC часовом поясе
+ * сервера. Возвращает null для пустой строки, неверного формата и
+ * несуществующей календарной даты (например, 30 февраля).
+ */
+export function parseLocalDateInput(value: string): Date | null {
+  const match = DATE_INPUT_RE.exec(value.trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
