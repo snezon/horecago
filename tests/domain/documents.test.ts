@@ -7,6 +7,7 @@ import {
   canViewWorkerDocuments,
   canUploadFor,
   isExpiredForShift,
+  expiredDocumentsBannerText,
 } from "@/lib/domain/documents";
 
 const URL = "/uploads/abc123.pdf";
@@ -299,5 +300,29 @@ describe("isExpiredForShift", () => {
     const shiftStart = new Date("2026-09-20T08:00:00");
     expect(isExpiredForShift(null, shiftStart)).toBe(false);
     expect(isExpiredForShift(undefined, shiftStart)).toBe(false);
+  });
+});
+
+describe("expiredDocumentsBannerText", () => {
+  it("ни одного просроченного — пустая строка", () => {
+    expect(expiredDocumentsBannerText([])).toBe("");
+  });
+
+  it("один просроченный документ — единственное число, тип назван", () => {
+    expect(expiredDocumentsBannerText(["Медкнижка"])).toBe(
+      "Медкнижка истекает до даты смены",
+    );
+  });
+
+  it("два просроченных документа — множественное число, оба названы, второй со строчной буквы", () => {
+    expect(expiredDocumentsBannerText(["Медкнижка", "Паспорт"])).toBe(
+      "Медкнижка, паспорт истекают до даты смены",
+    );
+  });
+
+  it("повторяющийся тип не дублируется в тексте", () => {
+    expect(expiredDocumentsBannerText(["Медкнижка", "Медкнижка"])).toBe(
+      "Медкнижка истекает до даты смены",
+    );
   });
 });

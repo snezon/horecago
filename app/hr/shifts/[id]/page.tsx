@@ -9,7 +9,7 @@ import { updateShift, hireApplicant, rejectApplicant } from "../actions";
 import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
 import { agencyLabel } from "@/lib/agency-label";
-import { isExpiredForShift } from "@/lib/domain/documents";
+import { isExpiredForShift, expiredDocumentsBannerText } from "@/lib/domain/documents";
 
 const APPLICATIONS_LIMIT = 200;
 
@@ -44,7 +44,11 @@ function CandidateDocuments({
 }) {
   if (docs.length === 0) return null;
 
-  const hasExpired = docs.some((d) => isExpiredForShift(d.expiresAt, shiftStart));
+  const expiredLabels = docs
+    .filter((d) => isExpiredForShift(d.expiresAt, shiftStart))
+    .map((d) => kindLabel[d.kind] ?? d.kind);
+  const hasExpired = expiredLabels.length > 0;
+  const bannerText = expiredDocumentsBannerText(expiredLabels);
 
   return (
     <div className="pt-3 border-t border-ink-200/70">
@@ -52,7 +56,7 @@ function CandidateDocuments({
         <div className="mb-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-100 border-2 border-red-400 text-red-900">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <p className="text-sm font-semibold leading-snug">
-            Документ истекает до даты смены — человек уже подтверждён, нужно среагировать заранее.
+            {bannerText} — человек уже подтверждён, нужно среагировать заранее.
           </p>
         </div>
       )}

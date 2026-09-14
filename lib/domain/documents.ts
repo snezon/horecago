@@ -81,3 +81,23 @@ export function isExpiredForShift(
   if (!expiresAt) return false;
   return startOfDay(expiresAt).getTime() < startOfDay(shiftStart).getTime();
 }
+
+/**
+ * Текст баннера над просроченными документами подтверждённого кандидата —
+ * называет, какие именно документы истекли, а не просто "документ": если
+ * у человека загружены и паспорт, и медкнижка, а просрочена только одна,
+ * работодателю не придётся раскрывать список и сверять вручную в момент,
+ * когда он решает, успеет ли найти замену. Принимает уже готовые русские
+ * названия (те же, что в списке документов, — см. kindLabel в
+ * app/hr/shifts/[id]/page.tsx), чтобы формулировки не разъехались.
+ */
+export function expiredDocumentsBannerText(expiredKindLabels: string[]): string {
+  const unique = Array.from(new Set(expiredKindLabels.map((l) => l.trim())));
+  if (unique.length === 0) return "";
+
+  const lowered = unique.map((l) => l.charAt(0).toLowerCase() + l.slice(1));
+  const list = lowered.join(", ");
+  const capitalized = list.charAt(0).toUpperCase() + list.slice(1);
+  const verb = unique.length === 1 ? "истекает" : "истекают";
+  return `${capitalized} ${verb} до даты смены`;
+}
