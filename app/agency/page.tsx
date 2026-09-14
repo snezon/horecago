@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { AlertTriangle, UserPlus } from "lucide-react";
+import { AlertTriangle, UserPlus, Upload } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { agencyIdsOf } from "@/lib/domain/access";
 import { MAX_INVITES_PER_BATCH } from "@/lib/domain/emails";
+import { CONSENT_VERSION } from "@/lib/domain/consent";
 import { sendWorkerInvites } from "./actions";
 
 type ConnectionState = "ACTIVE" | "REVOKED" | "PENDING" | "CANCELLED" | "EXPIRED";
@@ -171,6 +172,7 @@ export default async function AgencyDashboardPage({
                   <th className="px-4 py-3 font-medium">Статус</th>
                   <th className="px-4 py-3 font-medium">Письмо</th>
                   <th className="px-4 py-3 font-medium">Дата</th>
+                  <th className="px-4 py-3 font-medium">Документ</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,6 +181,7 @@ export default async function AgencyDashboardPage({
                   const state = connectionState(rep?.status, invite.status);
                   const deliveryFailed = invite.deliveryStatus === "FAILED";
                   const label = rep?.worker.name || rep?.worker.email || invite.email;
+                  const workerConsented = rep?.worker.consentVersion === CONSENT_VERSION;
                   return (
                     <tr key={invite.id} className="border-b border-ink-100 last:border-0">
                       <td className="px-4 py-3 text-ink-900">{label}</td>
@@ -199,6 +202,45 @@ export default async function AgencyDashboardPage({
                       </td>
                       <td className="px-4 py-3 text-ink-500">
                         {invite.createdAt.toLocaleDateString("ru-RU")}
+                      </td>
+                      <td className="px-4 py-3">
+                        {state === "ACTIVE" && rep && (
+                          workerConsented ? (
+                            <details>
+                              <summary className="cursor-pointer text-xs text-accent-600 hover:text-accent-700 select-none whitespace-nowrap">
+                                Загрузить
+                              </summary>
+                              <form
+                                action="/api/documents"
+                                method="post"
+                                encType="multipart/form-data"
+                                className="mt-2 flex flex-col gap-2 p-3 rounded-lg bg-ink-50 border border-ink-200/70 min-w-[220px]"
+                              >
+                                <input type="hidden" name="workerId" value={rep.worker.id} />
+                                <select name="kind" className="input !py-1.5 text-xs">
+                                  <option value="PASSPORT">Паспорт</option>
+                                  <option value="MED_BOOK">Медкнижка</option>
+                                  <option value="OTHER">Другое</option>
+                                </select>
+                                <input type="date" name="expiresAt" className="input !py-1.5 text-xs" placeholder="Действует до" />
+                                <input
+                                  type="file"
+                                  name="file"
+                                  required
+                                  className="input !py-1.5 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-ink-100 file:text-ink-700 file:text-xs"
+                                />
+                                <button className="btn-primary !py-1.5 !px-3 text-xs self-start">
+                                  <Upload className="w-3.5 h-3.5" />
+                                  Загрузить
+                                </button>
+                              </form>
+                            </details>
+                          ) : (
+                            <span className="text-xs text-ink-400 whitespace-nowrap">
+                              Не принял условия обработки данных
+                            </span>
+                          )
+                        )}
                       </td>
                     </tr>
                   );

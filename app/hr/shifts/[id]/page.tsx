@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  ArrowLeft, Phone, Mail, MapPin, FileText, CheckCircle2, X, Calendar, Wallet,
+  ArrowLeft, Phone, Mail, MapPin, FileText, CheckCircle2, X, Calendar, Wallet, AlertTriangle,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -9,6 +9,7 @@ import { updateShift, hireApplicant, rejectApplicant } from "../actions";
 import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
 import { agencyLabel } from "@/lib/agency-label";
+import { isExpiredForShift } from "@/lib/domain/documents";
 
 const APPLICATIONS_LIMIT = 200;
 
@@ -231,15 +232,28 @@ export default async function HRShiftPage({
                     <div className="pt-3 border-t border-ink-200/70">
                       <div className="text-xs uppercase tracking-wide text-ink-500 mb-2">Документы</div>
                       <ul className="flex flex-wrap gap-2">
-                        {wDocs.map((d) => (
-                          <li key={d.id}>
-                            <a href={d.url} target="_blank" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-ink-50 border border-ink-200 text-sm text-ink-700 hover:border-ink-400 hover:bg-white">
-                              <FileText className="w-3.5 h-3.5 text-ink-400" />
-                              {kindLabel[d.kind] ?? d.kind}
-                            </a>
-                          </li>
-                        ))}
+                        {wDocs.map((d) => {
+                          const expired = isExpiredForShift(d.expiresAt, shift.shiftStart);
+                          return (
+                            <li key={d.id} className="flex flex-col gap-1">
+                              <a href={d.url} target="_blank" className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm hover:bg-white ${expired ? "bg-red-50 border-red-300 text-red-800 hover:border-red-400" : "bg-ink-50 border-ink-200 text-ink-700 hover:border-ink-400"}`}>
+                                <FileText className={`w-3.5 h-3.5 ${expired ? "text-red-500" : "text-ink-400"}`} />
+                                {kindLabel[d.kind] ?? d.kind}
+                                {d.expiresAt && <span className="text-xs opacity-80">до {d.expiresAt.toLocaleDateString("ru-RU")}</span>}
+                              </a>
+                              {expired && (
+                                <span className="inline-flex items-center gap-1 text-xs text-red-700 font-medium">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  Срок истекает до даты смены
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
+                      <p className="text-xs text-ink-400 mt-2">
+                        Срок указан работником или агентством, площадка его не проверяла.
+                      </p>
                     </div>
                   )}
                 </li>

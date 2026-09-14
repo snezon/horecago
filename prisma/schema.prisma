@@ -89,13 +89,15 @@ model WorkerSkill {
 }
 
 model Document {
-  id        String   @id @default(cuid())
-  workerId  String
-  kind      String   // "PASSPORT" | "MED_BOOK" | "OTHER"
-  filename  String
-  url       String
-  createdAt DateTime @default(now())
-  worker    WorkerProfile @relation(fields: [workerId], references: [userId], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  workerId     String
+  kind         String    // "PASSPORT" | "MED_BOOK" | "OTHER"
+  filename     String
+  url          String
+  expiresAt    DateTime? // срок действия документа, со слов загрузившего — площадка его не проверяет
+  uploadedById String?   // id пользователя, который загрузил файл (сам работник или сотрудник агентства); без связи — документ переживает удаление загрузившего
+  createdAt    DateTime  @default(now())
+  worker       WorkerProfile @relation(fields: [workerId], references: [userId], onDelete: Cascade)
 }
 
 model Shift {

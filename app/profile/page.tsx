@@ -115,6 +115,11 @@ export default async function ProfilePage() {
                 <option value="OTHER">Другое</option>
               </select>
             </div>
+            <div className="flex-1 min-w-[160px]">
+              <label className="label">Действует до</label>
+              <input type="date" name="expiresAt" className="input" />
+              <p className="text-xs text-ink-500 mt-1">Обязательно для медкнижки</p>
+            </div>
             <div className="flex-1 min-w-[180px]">
               <label className="label">Файл</label>
               <input type="file" name="file" required className="input file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-ink-100 file:text-ink-700 file:text-xs" />
@@ -148,6 +153,12 @@ export default async function ProfilePage() {
                   <div className="min-w-0">
                     <div className="font-medium text-sm text-ink-900">{kindLabel[d.kind] ?? d.kind}</div>
                     <div className="text-xs text-ink-500 truncate">{d.filename}</div>
+                    <div className="text-xs text-ink-500 flex flex-wrap gap-x-2">
+                      {d.expiresAt && <span>до {d.expiresAt.toLocaleDateString("ru-RU")}</span>}
+                      {d.uploadedById && d.uploadedById !== d.workerId && (
+                        <span>загружено агентством</span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
