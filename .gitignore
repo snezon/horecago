@@ -11,3 +11,4 @@ prisma/dev.db-shm
 prisma/dev.db-wal
 /uploads
 tests/.tmp/
+tsconfig.tsbuildinfo

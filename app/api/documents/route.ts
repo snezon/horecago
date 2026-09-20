@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { hasConsent } from "@/lib/domain/consent";
 import { canUploadFor } from "@/lib/domain/documents";
 import { parseLocalDateInput } from "@/lib/datetime";
+import { appUrl } from "@/lib/app-url";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -86,5 +87,5 @@ export async function POST(req: NextRequest) {
   });
 
   const redirectTo = user.role === "AGENCY" ? "/agency" : "/profile";
-  return NextResponse.redirect(new URL(redirectTo, req.url), 303);
+  return NextResponse.redirect(appUrl(redirectTo), 303);
 }

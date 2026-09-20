@@ -3,6 +3,7 @@ import { consumeMagicLink, createSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { resolveSignupTarget } from "@/lib/domain/signup";
 import { acceptPendingInvites } from "@/lib/domain/representation";
+import { appUrl } from "@/lib/app-url";
 
 /** Роль ссылки → роль пользователя. "HR" остаётся до переезда экранов в фазе 1. */
 function userRoleFor(linkRole: string | null): string {
@@ -13,12 +14,12 @@ function userRoleFor(linkRole: string | null): string {
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
-  if (!token) return NextResponse.redirect(new URL("/login", req.url));
+  if (!token) return NextResponse.redirect(appUrl("/login"));
 
   const { link, reason } = await consumeMagicLink(token);
   if (!link) {
     const error = reason === "used" ? "used" : "expired";
-    return NextResponse.redirect(new URL(`/login?error=${error}`, req.url));
+    return NextResponse.redirect(appUrl(`/login?error=${error}`));
   }
 
   let user = await prisma.user.findUnique({
@@ -46,20 +47,20 @@ export async function GET(req: NextRequest) {
     isNewUser,
   );
   if (target !== "/") {
-    return NextResponse.redirect(new URL(target, req.url));
+    return NextResponse.redirect(appUrl(target));
   }
 
   // Вернувшийся пользователь: прежняя маршрутизация по незаполненному профилю.
   if (user.role === "HR" && !user.hrProfile) {
-    return NextResponse.redirect(new URL("/onboarding/hr", req.url));
+    return NextResponse.redirect(appUrl("/onboarding/hr"));
   }
   if (user.role === "WORKER" && !user.workerProfile) {
-    return NextResponse.redirect(new URL("/onboarding/worker", req.url));
+    return NextResponse.redirect(appUrl("/onboarding/worker"));
   }
   if (user.role === "AGENCY") {
-    return NextResponse.redirect(new URL("/agency", req.url));
+    return NextResponse.redirect(appUrl("/agency"));
   }
 
   const dest = user.role === "HR" ? "/hr" : "/feed";
-  return NextResponse.redirect(new URL(dest, req.url));
+  return NextResponse.redirect(appUrl(dest));
 }

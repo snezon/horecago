@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { destroySession } from "@/lib/auth";
+import { appUrl } from "@/lib/app-url";
 
 export async function POST() {
   await destroySession();
-  return NextResponse.redirect(new URL("/", process.env.APP_URL ?? "http://localhost:3100"));
+  return NextResponse.redirect(appUrl("/"));
 }

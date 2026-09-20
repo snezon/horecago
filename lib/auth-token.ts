@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import type { MagicLink } from "@prisma/client";
 import { prisma } from "./db";
 import { sendEmail } from "./email";
+import { appUrl } from "./app-url";
 
 const LOGIN_TTL_MIN = 60;
 // Приглашение агентства живёт неделю: аудитория смотрит почту в перерыв или
@@ -35,7 +36,7 @@ export async function createMagicLink(
       expiresAt,
     },
   });
-  const url = `${process.env.APP_URL ?? "http://localhost:3100"}/auth/verify?token=${token}`;
+  const url = appUrl(`/auth/verify?token=${token}`).toString();
   const html = `
     <p>Здравствуйте,</p>
     <p>Чтобы войти в HoReCaGo, перейдите по ссылке (действует ${ttlLabel(ttlMinutes)}):</p>
