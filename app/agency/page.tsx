@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertTriangle, UserPlus, Upload } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
@@ -115,6 +116,12 @@ export default async function AgencyDashboardPage({
           </p>
         </div>
       )}
+
+      <div>
+        <Link href="/agency/workers" className="btn-secondary">
+          Наши работники и отбор
+        </Link>
+      </div>
 
       <section className="card space-y-4">
         <h2 className="section-title">Пригласить работников</h2>

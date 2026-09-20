@@ -193,6 +193,14 @@ export default async function HRShiftPage({
           </div>
         </div>
 
+        {shift.status === "OPEN" && (
+          <div className="mb-4">
+            <Link href={`/workers?shift=${shift.id}`} className="btn-secondary">
+              Подобрать людей под эту смену
+            </Link>
+          </div>
+        )}
+
         <div className="h-1.5 rounded-full bg-ink-100 overflow-hidden mb-6">
           <div className="h-full bg-accent-500 transition-all" style={{ width: `${progress}%` }} />
         </div>

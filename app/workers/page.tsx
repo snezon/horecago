@@ -8,20 +8,94 @@ import { prisma } from "@/lib/db";
 import { formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
 import { agencyLabel } from "@/lib/agency-label";
+import { WorkerFiltersForm } from "@/app/_components/WorkerFilters";
+import {
+  filtersFromParams,
+  matchesFilters,
+  type WorkerFilters,
+} from "@/lib/domain/worker-filter";
 
 export const dynamic = "force-dynamic";
 
 const WORKERS_LIMIT = 200;
 
-export default async function WorkersPage({ searchParams }: { searchParams: { position?: string } }) {
+
+/** Ссылка на позицию, не теряющая уже выбранные фильтры. */
+function positionHref(
+  positionId: number,
+  params: Record<string, string | undefined>,
+): string {
+  const query = new URLSearchParams();
+  for (const key of ["city", "metro", "med", "permit"]) {
+    if (params[key]) query.set(key, params[key]!);
+  }
+  query.set("position", String(positionId));
+  return `/workers?${query.toString()}`;
+}
+
+/** Условия смены одной строкой — что именно подставилось в подбор. */
+function requirementsSummary(shift: {
+  city: string | null;
+  metro: string | null;
+  requireMedBook: boolean;
+  requireWorkPermit: boolean;
+  payment: number;
+}): string {
+  const parts: string[] = [];
+  if (shift.city?.trim()) parts.push(shift.city.trim());
+  if (shift.metro?.trim()) parts.push(`метро ${shift.metro.trim()}`);
+  if (shift.requireMedBook) parts.push("медкнижка");
+  if (shift.requireWorkPermit) parts.push("разрешение на работу");
+  parts.push(`ставка до ${shift.payment} ₽`);
+  return parts.join(", ");
+}
+
+export default async function WorkersPage({
+  searchParams,
+}: {
+  searchParams: {
+    position?: string;
+    city?: string;
+    metro?: string;
+    med?: string;
+    permit?: string;
+    shift?: string;
+  };
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=HR");
   if (user.role !== "HR") redirect("/");
 
   const positions = await prisma.position.findMany({ orderBy: { id: "asc" } });
-  const filter = searchParams.position ? Number(searchParams.position) : null;
 
-  const workers = await prisma.user.findMany({
+  // Подбор под смену: условия берём из неё самой, чтобы заказчику не
+  // переписывать их руками — и медкнижку проверяем на дату смены, а не на
+  // сегодня.
+  const shift = searchParams.shift
+    ? await prisma.shift.findFirst({
+        where: { id: searchParams.shift, hrId: user.id },
+        include: { position: true },
+      })
+    : null;
+
+  const filter = shift
+    ? shift.positionId
+    : searchParams.position
+      ? Number(searchParams.position)
+      : null;
+
+  const filters: WorkerFilters = shift
+    ? {
+        city: shift.city,
+        metro: shift.metro,
+        medBook: shift.requireMedBook,
+        workPermit: shift.requireWorkPermit,
+        maxPayment: shift.payment,
+      }
+    : filtersFromParams(searchParams);
+  const matchOn = shift ? shift.shiftStart : new Date();
+
+  const found = await prisma.user.findMany({
     where: {
       role: "WORKER",
       workerProfile: {
@@ -42,6 +116,12 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
     take: WORKERS_LIMIT,
   });
 
+  // Город и станции лежат строками, поэтому сверяем их в коде: SQLite не умеет
+  // сравнивать кириллицу без учёта регистра, а список ограничен сверху.
+  const workers = found.filter((w) =>
+    matchesFilters(w.workerProfile, filters, matchOn),
+  );
+
   const agencyMap = await representingAgencies(workers.map((w) => w.id));
 
   return (
@@ -51,10 +131,20 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
         <p className="text-ink-500">{workers.length} {plural(workers.length, "кандидат", "кандидата", "кандидатов")} ищут смены</p>
       </div>
 
+      {shift ? (
+        <div className="card !p-4 text-sm text-ink-700">
+          Подбор под смену «{shift.title}» ({shift.position.name}). Условия смены
+          подставлены: {requirementsSummary(shift) || "особых нет"}.{" "}
+          <Link href="/workers" className="underline text-ink-900">Показать всех соискателей</Link>
+        </div>
+      ) : (
+        <WorkerFiltersForm action="/workers" filters={filters} hidden={{ position: searchParams.position }} />
+      )}
+
       <div className="flex flex-wrap gap-2">
         <Link href="/workers" className={!filter ? "chip-active" : "chip-default"}>Все</Link>
         {positions.map((p) => (
-          <Link key={p.id} href={`/workers?position=${p.id}`} className={filter === p.id ? "chip-active" : "chip-default"}>
+          <Link key={p.id} href={positionHref(p.id, searchParams)} className={filter === p.id ? "chip-active" : "chip-default"}>
             {p.name}
           </Link>
         ))}
