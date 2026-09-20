@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { hireApplication } from "@/lib/domain/hiring";
 import { matchShift, type MatchResult } from "@/lib/domain/matching";
 import { notifyHired } from "@/lib/domain/hire-notice";
+import { busyWorkerIds } from "@/lib/domain/availability";
 
 /**
  * За сколько до начала смены автоматика обязана принять решение. Решать за
@@ -65,9 +66,15 @@ type ShiftRow = Awaited<
   >
 >;
 
-function candidatesOf(shift: NonNullable<ShiftRow>): Candidate[] {
+function candidatesOf(
+  shift: NonNullable<ShiftRow>,
+  busy: Set<string>,
+): Candidate[] {
   return shift.applications
     .filter((a) => a.worker.workerProfile)
+    // Занятого на пересекающейся смене нанимать нельзя: он туда просто не
+    // придёт, а заказчик узнает об этом утром в день смены.
+    .filter((a) => !busy.has(a.workerId))
     .map((a) => ({
       applicationId: a.id,
       createdAt: a.createdAt,
@@ -106,7 +113,8 @@ export async function runAutoHire(now: Date = new Date()): Promise<{
   const hired: string[] = [];
   for (const shift of due) {
     const seats = shift.headcount - shift.hiredCount;
-    for (const candidate of rankCandidates(candidatesOf(shift)).slice(0, seats)) {
+    const busy = await busyWorkerIds(shift.shiftStart, shift.shiftEnd, shift.id);
+    for (const candidate of rankCandidates(candidatesOf(shift, busy)).slice(0, seats)) {
       const result = await hireApplication(candidate.applicationId);
       if (result === "HIRED") {
         hired.push(candidate.applicationId);
@@ -156,6 +164,9 @@ export async function autoHireOnApplication(
     minPayment: profile.minPayment,
   });
   if (!match.fits) return false;
+
+  const busy = await busyWorkerIds(shift.shiftStart, shift.shiftEnd, shift.id);
+  if (busy.has(application.workerId)) return false;
 
   const hired = (await hireApplication(applicationId)) === "HIRED";
   if (hired) await notifyHired(applicationId);

@@ -9,15 +9,19 @@ import { formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
 import { agencyLabel } from "@/lib/agency-label";
 import { WorkerFiltersForm, positionHref } from "@/app/_components/WorkerFilters";
+import { MatchBadge } from "@/app/_components/MatchBadge";
+import { Pager } from "@/app/_components/Pager";
 import {
   filtersFromParams,
   workerFilterWhere,
   type WorkerFilters,
 } from "@/lib/domain/worker-filter";
+import { busyWorkerIds } from "@/lib/domain/availability";
+import { matchShift } from "@/lib/domain/matching";
 
 export const dynamic = "force-dynamic";
 
-const WORKERS_LIMIT = 200;
+const PAGE_SIZE = 50;
 
 
 /** Условия смены одной строкой — что именно подставилось в подбор. */
@@ -37,6 +41,16 @@ function requirementsSummary(shift: {
   return parts.join(", ");
 }
 
+
+/** Сколько условий смены выполняет кандидат — по нему же сортируется подбор. */
+function matchedCount(
+  shift: Parameters<typeof matchShift>[0],
+  worker: { workerProfile: Parameters<typeof matchShift>[1] | null },
+): number {
+  if (!worker.workerProfile) return 0;
+  return matchShift(shift, worker.workerProfile).matched.length;
+}
+
 export default async function WorkersPage({
   searchParams,
 }: {
@@ -47,6 +61,8 @@ export default async function WorkersPage({
     med?: string;
     permit?: string;
     shift?: string;
+    edited?: string;
+    page?: string;
   };
 }) {
   const user = await getCurrentUser();
@@ -71,26 +87,46 @@ export default async function WorkersPage({
       ? Number(searchParams.position)
       : null;
 
-  const filters: WorkerFilters = shift
-    ? {
-        city: shift.city,
-        metro: shift.metro,
-        medBook: shift.requireMedBook,
-        workPermit: shift.requireWorkPermit,
-        maxPayment: shift.payment,
-      }
-    : filtersFromParams(searchParams);
+  // Условия смены — только начальное значение отбора: заказчик может поправить
+  // их прямо здесь, и тогда мы берём то, что он ввёл (метка edited), а не то,
+  // что записано в смене.
+  const edited = searchParams.edited === "1";
+  const filters: WorkerFilters =
+    shift && !edited
+      ? {
+          city: shift.city,
+          metro: shift.metro,
+          medBook: shift.requireMedBook,
+          workPermit: shift.requireWorkPermit,
+          maxPayment: shift.payment,
+        }
+      : {
+          ...filtersFromParams(searchParams),
+          maxPayment: shift ? shift.payment : null,
+        };
   const matchOn = shift ? shift.shiftStart : new Date();
 
-  const workers = await prisma.user.findMany({
-    where: {
-      role: "WORKER",
-      workerProfile: {
-        isLookingForWork: true,
-        ...(filter ? { skills: { some: { positionId: filter } } } : {}),
-        ...workerFilterWhere(filters, matchOn),
-      },
+  // Занятые на пересекающейся смене в подбор не попадают: звать человека,
+  // который в это время уже работает, — потерянное время обеих сторон.
+  const busy = shift
+    ? await busyWorkerIds(shift.shiftStart, shift.shiftEnd, shift.id)
+    : new Set<string>();
+
+  const where = {
+    role: "WORKER",
+    ...(busy.size > 0 ? { id: { notIn: [...busy] } } : {}),
+    workerProfile: {
+      isLookingForWork: true,
+      ...(filter ? { skills: { some: { positionId: filter } } } : {}),
+      ...workerFilterWhere(filters, matchOn),
     },
+  };
+
+  const page = Math.max(1, Number(searchParams.page) || 1);
+  const total = await prisma.user.count({ where });
+
+  const found = await prisma.user.findMany({
+    where,
     include: {
       workerProfile: {
         include: {
@@ -99,8 +135,20 @@ export default async function WorkersPage({
       },
     },
     orderBy: { createdAt: "desc" },
-    take: WORKERS_LIMIT,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
   });
+
+  // В подборе под смену порядок тот же, каким его видит авто-найм: сначала
+  // те, у кого совпало больше условий. Иначе экран и автоматика показывали бы
+  // заказчику разных «лучших».
+  const workers = shift
+    ? [...found].sort(
+        (a, b) =>
+          matchedCount(shift, b) - matchedCount(shift, a) ||
+          a.createdAt.getTime() - b.createdAt.getTime(),
+      )
+    : found;
 
 
   const agencyMap = await representingAgencies(workers.map((w) => w.id));
@@ -109,18 +157,37 @@ export default async function WorkersPage({
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-ink-900 mb-1">Соискатели</h1>
-        <p className="text-ink-500">{workers.length} {plural(workers.length, "кандидат", "кандидата", "кандидатов")} ищут смены</p>
+        <p className="text-ink-500">
+          {total} {plural(total, "кандидат", "кандидата", "кандидатов")} ищут смены
+          {busy.size > 0 && `, ещё ${busy.size} заняты в это время`}
+        </p>
       </div>
 
-      {shift ? (
+      {shift && (
         <div className="card !p-4 text-sm text-ink-700">
-          Подбор под смену «{shift.title}» ({shift.position.name}). Условия смены
-          подставлены: {requirementsSummary(shift) || "особых нет"}.{" "}
-          <Link href="/workers" className="underline text-ink-900">Показать всех соискателей</Link>
+          Подбор под смену «{shift.title}» ({shift.position.name}).{" "}
+          {edited
+            ? "Отбор изменён вручную."
+            : `Условия смены подставлены: ${requirementsSummary(shift) || "особых нет"}.`}{" "}
+          <Link href={`/workers?shift=${shift.id}`} className="underline text-ink-900">
+            Вернуть условия смены
+          </Link>
+          {" · "}
+          <Link href="/workers" className="underline text-ink-900">
+            Показать всех соискателей
+          </Link>
         </div>
-      ) : (
-        <WorkerFiltersForm action="/workers" filters={filters} hidden={{ position: searchParams.position }} />
       )}
+
+      <WorkerFiltersForm
+        action="/workers"
+        filters={filters}
+        hidden={{
+          position: searchParams.position,
+          shift: searchParams.shift,
+          edited: shift ? "1" : undefined,
+        }}
+      />
 
       <div className="flex flex-wrap gap-2">
         <Link href={positionHref("/workers", null, searchParams)} className={!filter ? "chip-active" : "chip-default"}>Все</Link>
@@ -154,6 +221,8 @@ export default async function WorkersPage({
                       )}
                     </div>
                   </div>
+
+                  {shift && <MatchBadge shift={shift} profile={w.workerProfile} />}
 
                   <AccessBadges profile={w.workerProfile} className="mb-3" />
 
@@ -189,9 +258,7 @@ export default async function WorkersPage({
         </ul>
       )}
 
-      {workers.length === WORKERS_LIMIT && (
-        <p className="text-sm text-ink-500">Показаны первые {WORKERS_LIMIT} — уточните фильтр</p>
-      )}
+      <Pager base="/workers" params={searchParams} page={page} pageSize={PAGE_SIZE} total={total} />
     </div>
   );
 }

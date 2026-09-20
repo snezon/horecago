@@ -254,3 +254,63 @@ describe("autoHireOnApplication", () => {
     expect(await autoHireOnApplication(app.id)).toBe(false);
   });
 });
+
+describe("авто-найм и занятость", () => {
+  beforeEach(resetDb);
+
+  async function hireElsewhere(workerEmail: string, startHour: number, endHour: number) {
+    const worker = await prisma.user.findUniqueOrThrow({ where: { email: workerEmail } });
+    const hr = await prisma.user.create({
+      data: { email: `other-hr-${startHour}@example.com`, role: "HR" },
+    });
+    const position = await prisma.position.create({
+      data: { name: `Другая позиция ${startHour}` },
+    });
+    const other = await prisma.shift.create({
+      data: {
+        hrId: hr.id,
+        positionId: position.id,
+        title: "Другая смена",
+        description: "",
+        payment: 3000,
+        address: "Москва",
+        headcount: 1,
+        hiredCount: 1,
+        shiftStart: new Date(2026, 9, 1, startHour, 0),
+        shiftEnd: new Date(2026, 9, 1, endHour, 0),
+      },
+    });
+    await prisma.application.create({
+      data: { shiftId: other.id, workerId: worker.id, status: "HIRED" },
+    });
+  }
+
+  it("занятого на пересекающейся смене не нанимает", async () => {
+    const shift = await makeShift({ headcount: 1 });
+    await apply(shift.id, "busy@example.com", {}, new Date(2026, 9, 1, 9, 0));
+    // Смена в тесте идёт 18:00–23:00, занят человек 20:00–23:00.
+    await hireElsewhere("busy@example.com", 20, 23);
+
+    const result = await runAutoHire(new Date(2026, 9, 1, 12, 0));
+
+    expect(result.hired).toEqual([]);
+  });
+
+  it("занятого в другое время нанимает", async () => {
+    const shift = await makeShift({ headcount: 1 });
+    await apply(shift.id, "morning@example.com", {}, new Date(2026, 9, 1, 9, 0));
+    await hireElsewhere("morning@example.com", 8, 14);
+
+    const result = await runAutoHire(new Date(2026, 9, 1, 12, 0));
+
+    expect(result.hired).toHaveLength(1);
+  });
+
+  it("в доборе занятого тоже не берёт", async () => {
+    const shift = await makeShift({ headcount: 2, doneAt: new Date(2026, 9, 1, 12, 0) });
+    const app = await apply(shift.id, "late-busy@example.com", {}, new Date(2026, 9, 1, 13, 0));
+    await hireElsewhere("late-busy@example.com", 20, 23);
+
+    expect(await autoHireOnApplication(app.id)).toBe(false);
+  });
+});

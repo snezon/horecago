@@ -9,10 +9,11 @@ import { locationLine } from "@/lib/domain/location";
 import { AccessBadges } from "@/app/_components/AccessBadges";
 import { WorkerFiltersForm, positionHref } from "@/app/_components/WorkerFilters";
 import { filtersFromParams, workerFilterWhere } from "@/lib/domain/worker-filter";
+import { Pager } from "@/app/_components/Pager";
 
 export const dynamic = "force-dynamic";
 
-const WORKERS_LIMIT = 200;
+const PAGE_SIZE = 50;
 
 /**
  * Свои работники глазами агентства: тем же отбором, что у заказчика. Агентство
@@ -22,7 +23,14 @@ const WORKERS_LIMIT = 200;
 export default async function AgencyWorkersPage({
   searchParams,
 }: {
-  searchParams: { city?: string; metro?: string; med?: string; permit?: string; position?: string };
+  searchParams: {
+    city?: string;
+    metro?: string;
+    med?: string;
+    permit?: string;
+    position?: string;
+    page?: string;
+  };
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=AGENCY");
@@ -39,17 +47,22 @@ export default async function AgencyWorkersPage({
     where: { agencyId, status: "ACTIVE" },
   });
 
-  const reps = await prisma.representation.findMany({
-    where: {
-      agencyId,
-      status: "ACTIVE",
-      worker: {
-        workerProfile: {
-          ...workerFilterWhere(filters, new Date()),
-          ...(positionId ? { skills: { some: { positionId } } } : {}),
-        },
+  const where = {
+    agencyId,
+    status: "ACTIVE",
+    worker: {
+      workerProfile: {
+        ...workerFilterWhere(filters, new Date()),
+        ...(positionId ? { skills: { some: { positionId } } } : {}),
       },
     },
+  };
+
+  const page = Math.max(1, Number(searchParams.page) || 1);
+  const matching = await prisma.representation.count({ where });
+
+  const reps = await prisma.representation.findMany({
+    where,
     include: {
       worker: {
         include: {
@@ -57,7 +70,9 @@ export default async function AgencyWorkersPage({
         },
       },
     },
-    take: WORKERS_LIMIT,
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
   });
 
   const workers = reps.map((r) => r.worker);
@@ -71,7 +86,7 @@ export default async function AgencyWorkersPage({
       <div>
         <h1 className="text-3xl font-bold text-ink-900 mb-1">Наши работники</h1>
         <p className="text-ink-500">
-          {workers.length} из {total} подходят под отбор
+          {matching} из {total} подходят под отбор
         </p>
       </div>
 
@@ -123,6 +138,12 @@ export default async function AgencyWorkersPage({
                 </div>
               </div>
 
+              {w.workerProfile?.isLookingForWork === false && (
+                <div className="mb-2">
+                  <span className="badge-muted">Сейчас не ищет смены</span>
+                </div>
+              )}
+
               <AccessBadges profile={w.workerProfile} className="mb-3" />
 
               <div className="flex flex-wrap gap-1.5 mb-3">
@@ -147,9 +168,13 @@ export default async function AgencyWorkersPage({
         </ul>
       )}
 
-      {workers.length === WORKERS_LIMIT && (
-        <p className="text-sm text-ink-500">Показаны первые {WORKERS_LIMIT} — уточните отбор</p>
-      )}
+      <Pager
+        base="/agency/workers"
+        params={searchParams}
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={matching}
+      />
     </div>
   );
 }
