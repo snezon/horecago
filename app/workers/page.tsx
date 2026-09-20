@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
 import { agencyLabel } from "@/lib/agency-label";
-import { WorkerFiltersForm } from "@/app/_components/WorkerFilters";
+import { WorkerFiltersForm, positionHref } from "@/app/_components/WorkerFilters";
 import {
   filtersFromParams,
   workerFilterWhere,
@@ -19,19 +19,6 @@ export const dynamic = "force-dynamic";
 
 const WORKERS_LIMIT = 200;
 
-
-/** Ссылка на позицию, не теряющая уже выбранные фильтры. */
-function positionHref(
-  positionId: number,
-  params: Record<string, string | undefined>,
-): string {
-  const query = new URLSearchParams();
-  for (const key of ["city", "metro", "med", "permit"]) {
-    if (params[key]) query.set(key, params[key]!);
-  }
-  query.set("position", String(positionId));
-  return `/workers?${query.toString()}`;
-}
 
 /** Условия смены одной строкой — что именно подставилось в подбор. */
 function requirementsSummary(shift: {
@@ -136,9 +123,9 @@ export default async function WorkersPage({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Link href="/workers" className={!filter ? "chip-active" : "chip-default"}>Все</Link>
+        <Link href={positionHref("/workers", null, searchParams)} className={!filter ? "chip-active" : "chip-default"}>Все</Link>
         {positions.map((p) => (
-          <Link key={p.id} href={positionHref(p.id, searchParams)} className={filter === p.id ? "chip-active" : "chip-default"}>
+          <Link key={p.id} href={positionHref("/workers", p.id, searchParams)} className={filter === p.id ? "chip-active" : "chip-default"}>
             {p.name}
           </Link>
         ))}

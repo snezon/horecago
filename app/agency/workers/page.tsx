@@ -7,7 +7,7 @@ import { agencyIdsOf } from "@/lib/domain/access";
 import { formatRub } from "@/lib/datetime";
 import { locationLine } from "@/lib/domain/location";
 import { AccessBadges } from "@/app/_components/AccessBadges";
-import { WorkerFiltersForm } from "@/app/_components/WorkerFilters";
+import { WorkerFiltersForm, positionHref } from "@/app/_components/WorkerFilters";
 import { filtersFromParams, workerFilterWhere } from "@/lib/domain/worker-filter";
 
 export const dynamic = "force-dynamic";
@@ -82,13 +82,16 @@ export default async function AgencyWorkersPage({
       />
 
       <div className="flex flex-wrap gap-2">
-        <Link href="/agency/workers" className={!positionId ? "chip-active" : "chip-default"}>
+        <Link
+          href={positionHref("/agency/workers", null, searchParams)}
+          className={!positionId ? "chip-active" : "chip-default"}
+        >
           Все
         </Link>
         {positions.map((p) => (
           <Link
             key={p.id}
-            href={`/agency/workers?position=${p.id}`}
+            href={positionHref("/agency/workers", p.id, searchParams)}
             className={positionId === p.id ? "chip-active" : "chip-default"}
           >
             {p.name}
@@ -142,6 +145,10 @@ export default async function AgencyWorkersPage({
             </li>
           ))}
         </ul>
+      )}
+
+      {workers.length === WORKERS_LIMIT && (
+        <p className="text-sm text-ink-500">Показаны первые {WORKERS_LIMIT} — уточните отбор</p>
       )}
     </div>
   );

@@ -1,5 +1,20 @@
 import type { WorkerFilters } from "@/lib/domain/worker-filter";
 
+/** Ссылка на позицию, не теряющая уже выбранные фильтры. */
+export function positionHref(
+  base: string,
+  positionId: number | null,
+  params: Record<string, string | undefined>,
+): string {
+  const query = new URLSearchParams();
+  for (const key of ["city", "metro", "med", "permit"]) {
+    if (params[key]) query.set(key, params[key]!);
+  }
+  if (positionId) query.set("position", String(positionId));
+  const qs = query.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
 /**
  * Фильтры соискателей обычной GET-формой: ссылку с найденным списком можно
  * переслать коллеге или сохранить, а состояние живёт в адресе, а не в памяти
