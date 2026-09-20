@@ -1,40 +1,42 @@
-import { METRO_STATIONS, type MetroStation } from "@/lib/data/metro-stations.generated";
+import {
+  METRO_STATIONS_BY_CITY,
+  METRO_CITIES,
+  type MetroStation,
+} from "@/lib/data/metro-stations.generated";
+import { suggestMetro, hasDadataKey } from "@/lib/dadata";
+import {
+  MAX_METRO_STATIONS,
+  sanitizeMetroInput,
+  stationKey,
+} from "@/lib/domain/metro-input";
 
-/** Сколько станций работник может отметить: больше — уже «еду куда угодно». */
-export const MAX_METRO_STATIONS = 10;
+export { METRO_CITIES };
 
-const byKey = new Map<string, MetroStation>(
-  METRO_STATIONS.map((s) => [stationKey(s.name), s]),
-);
+export function cityHasMetro(city: string): boolean {
+  return METRO_CITIES.some((c) => c.toLowerCase() === city.trim().toLowerCase());
+}
 
-/** Ключ сравнения: регистр и ё/е не должны мешать совпадению. */
-export function stationKey(name: string): string {
-  return name.toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim();
+function cityStations(city: string): MetroStation[] {
+  const key = city.trim().toLowerCase();
+  const match = METRO_CITIES.find((c) => c.toLowerCase() === key);
+  return match ? METRO_STATIONS_BY_CITY[match] : [];
 }
 
 /**
- * Люди (и прежние профили) пишут станцию с приставкой — «м. Тверская»,
- * «метро Тверская». Приставку срезаем, иначе выбор из справочника молча
- * терял бы всё, что было введено руками до его появления.
+ * Подсказки из своего справочника — запасной путь, когда DaData молчит.
+ * Станции, начинающиеся с запроса, идут выше тех, где он встретился в
+ * середине: человек печатает «пар» ради «Парка культуры», а не «Технопарка».
  */
-const PREFIX_RE = /^(?:м\.?|метро)\s+/;
-
-export function findStation(name: string): MetroStation | undefined {
-  const key = stationKey(name);
-  return byKey.get(key) ?? byKey.get(key.replace(PREFIX_RE, "").trim());
-}
-
-/**
- * Подсказки к вводу. Станции, начинающиеся с запроса, идут выше тех, где он
- * встретился в середине: человек печатает «пар» ради «Парка культуры», а не
- * ради «Технопарка».
- */
-export function searchStations(query: string, limit = 8): MetroStation[] {
+export function searchStationsOffline(
+  city: string,
+  query: string,
+  limit = 8,
+): MetroStation[] {
   const q = stationKey(query);
   if (!q) return [];
   const starts: MetroStation[] = [];
   const inside: MetroStation[] = [];
-  for (const s of METRO_STATIONS) {
+  for (const s of cityStations(city)) {
     const key = stationKey(s.name);
     if (key.startsWith(q)) starts.push(s);
     else if (key.includes(q)) inside.push(s);
@@ -43,27 +45,45 @@ export function searchStations(query: string, limit = 8): MetroStation[] {
   return [...starts, ...inside].slice(0, limit);
 }
 
-/**
- * Что действительно сохраняем из поля метро: только станции из справочника,
- * в его написании, без повторов и не больше MAX_METRO_STATIONS. Форма шлёт
- * обычную строку, и доверять ей нельзя — в базе должны лежать названия,
- * по которым потом можно искать, а не «м.Тверская» и «тверская/пушкинская».
- */
-export function parseMetroSelection(raw: string): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const piece of raw.split(",")) {
-    const station = findStation(piece);
-    if (!station) continue;
-    const key = stationKey(station.name);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(station.name);
-    if (out.length >= MAX_METRO_STATIONS) break;
-  }
-  return out;
+export function findStationOffline(
+  city: string,
+  name: string,
+): MetroStation | undefined {
+  const key = stationKey(name);
+  return cityStations(city).find((s) => stationKey(s.name) === key);
 }
 
-export function formatMetroSelection(stations: string[]): string {
-  return stations.join(", ");
+/**
+ * Что действительно сохраняем из поля метро. Сначала свой справочник — он
+ * бесплатный и закрывает все города РФ с метро; чего там нет, спрашиваем у
+ * DaData. Если DaData недоступна, сохраняем как ввели: потерять станции
+ * работника из-за чужого сбоя хуже, чем пустить неидеальное написание.
+ */
+export async function resolveStations(
+  city: string,
+  raw: string,
+): Promise<string[]> {
+  const candidates = sanitizeMetroInput(raw).slice(0, MAX_METRO_STATIONS);
+  if (candidates.length === 0) return [];
+
+  const resolved: string[] = [];
+  for (const name of candidates) {
+    const offline = findStationOffline(city, name);
+    if (offline) {
+      resolved.push(offline.name);
+      continue;
+    }
+    if (!hasDadataKey()) {
+      resolved.push(name);
+      continue;
+    }
+    const suggestions = await suggestMetro(city, name, 5);
+    if (suggestions === null) {
+      resolved.push(name);
+      continue;
+    }
+    const exact = suggestions.find((s) => stationKey(s.name) === stationKey(name));
+    if (exact) resolved.push(exact.name);
+  }
+  return resolved;
 }

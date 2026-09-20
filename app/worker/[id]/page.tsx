@@ -6,6 +6,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { AccessBadges } from "@/app/_components/AccessBadges";
+import { locationLine } from "@/lib/domain/location";
 import { inviteWorker } from "./actions";
 import { shiftLabel, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
@@ -92,9 +93,9 @@ export default async function WorkerPage({
           </div>
           <div>
             <h1 className="text-2xl font-bold text-ink-900">{worker.name ?? "Без имени"}</h1>
-            {worker.workerProfile.metro && (
+            {locationLine(worker.workerProfile) && (
               <div className="flex items-center gap-1.5 text-sm text-ink-500 mt-0.5">
-                <MapPin className="w-3.5 h-3.5" /> {worker.workerProfile.metro}
+                <MapPin className="w-3.5 h-3.5" /> {locationLine(worker.workerProfile)}
               </div>
             )}
             {agencies.length > 0 && (

@@ -306,6 +306,7 @@ async function main() {
         phone: w.phone,
         workerProfile: {
           create: {
+            city: "Москва",
             metro: w.metro,
             about: w.about,
             minPayment: w.minPayment,

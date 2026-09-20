@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { toDateInput } from "@/lib/datetime";
-import { MetroPicker } from "@/app/_components/MetroPicker";
+import { LocationFields } from "@/app/_components/LocationFields";
+import { METRO_CITIES } from "@/lib/domain/metro";
 import { saveWorkerOnboarding } from "./actions";
 
 export default async function WorkerOnboardingPage({
@@ -45,10 +46,11 @@ export default async function WorkerOnboardingPage({
             <input name="phone" className="input" defaultValue={user.phone ?? ""} required placeholder="+7..." />
           </div>
         </div>
-        <div>
-          <label className="label">Укажите станции метро, удобные для работы</label>
-          <MetroPicker name="metro" defaultValue={user.workerProfile?.metro ?? ""} />
-        </div>
+        <LocationFields
+          defaultCity={user.workerProfile?.city ?? ""}
+          defaultMetro={user.workerProfile?.metro ?? ""}
+          metroCities={METRO_CITIES}
+        />
         <div>
           <label className="label">О себе</label>
           <textarea name="about" className="input min-h-[90px]" defaultValue={user.workerProfile?.about ?? ""} placeholder="Опыт, языки, что важно..." />

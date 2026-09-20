@@ -1,47 +1,77 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   MAX_METRO_STATIONS,
-  findStation,
   formatMetroSelection,
-  parseMetroSelection,
-  searchStations,
+  sanitizeMetroInput,
   stationKey,
-} from "@/lib/domain/metro";
+} from "@/lib/domain/metro-input";
+
+interface Suggestion {
+  name: string;
+  line: string;
+  color: string;
+}
 
 /**
- * Выбор станций метро из справочника (Москва, api.hh.ru). Сами станции
- * уезжают на сервер обычной строкой в скрытом поле — форма остаётся простой
- * серверной формой, а сервер всё равно перепроверяет выбор по справочнику.
+ * Выбор станций метро. Подсказки приходят с сервера (DaData, при её молчании —
+ * свой справочник), поэтому в браузер не уезжают ни ключ, ни весь список
+ * станций. На сервер станции уходят обычной строкой в скрытом поле, и сервер
+ * всё равно перепроверяет выбор.
  */
 export function MetroPicker({
   name,
   defaultValue,
+  city,
 }: {
   name: string;
   defaultValue: string;
+  city: string;
 }) {
   const [selected, setSelected] = useState<string[]>(() =>
-    parseMetroSelection(defaultValue),
+    sanitizeMetroInput(defaultValue),
   );
+  const [colors, setColors] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const suggestions = useMemo(() => {
-    const chosen = new Set(selected.map(stationKey));
-    return searchStations(query).filter((s) => !chosen.has(stationKey(s.name)));
-  }, [query, selected]);
 
   const full = selected.length >= MAX_METRO_STATIONS;
 
-  function add(stationName: string) {
-    const station = findStation(stationName);
-    if (!station || full) return;
-    if (selected.some((s) => stationKey(s) === stationKey(station.name))) return;
-    setSelected([...selected, station.name]);
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setSuggestions([]);
+      return;
+    }
+    // Пауза, чтобы не дёргать подсказку на каждую букву.
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/suggest/metro?city=${encodeURIComponent(city)}&q=${encodeURIComponent(q)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { stations?: Suggestion[] };
+        const chosen = new Set(selected.map(stationKey));
+        setSuggestions(
+          (data.stations ?? []).filter((s) => !chosen.has(stationKey(s.name))),
+        );
+      } catch {
+        setSuggestions([]);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query, city, selected]);
+
+  function add(s: Suggestion) {
+    if (full) return;
+    if (selected.some((x) => stationKey(x) === stationKey(s.name))) return;
+    setSelected([...selected, s.name]);
+    setColors({ ...colors, [stationKey(s.name)]: s.color });
     setQuery("");
+    setSuggestions([]);
     inputRef.current?.focus();
   }
 
@@ -55,30 +85,27 @@ export function MetroPicker({
 
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {selected.map((s) => {
-            const station = findStation(s);
-            return (
+          {selected.map((s) => (
+            <span
+              key={s}
+              className="inline-flex items-center gap-1.5 text-sm bg-ink-100 text-ink-800 pl-2 pr-1 py-1 rounded-full"
+            >
               <span
-                key={s}
-                className="inline-flex items-center gap-1.5 text-sm bg-ink-100 text-ink-800 pl-2 pr-1 py-1 rounded-full"
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: colors[stationKey(s)] ?? "#94A3B8" }}
+                aria-hidden
+              />
+              {s}
+              <button
+                type="button"
+                onClick={() => remove(s)}
+                className="p-0.5 rounded-full hover:bg-ink-200 text-ink-500"
+                aria-label={`Убрать ${s}`}
               >
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: station?.color ?? "#94a3b8" }}
-                  aria-hidden
-                />
-                {s}
-                <button
-                  type="button"
-                  onClick={() => remove(s)}
-                  className="p-0.5 rounded-full hover:bg-ink-200 text-ink-500"
-                  aria-label={`Убрать ${s}`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            );
-          })}
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
         </div>
       )}
 
@@ -94,10 +121,10 @@ export function MetroPicker({
             if (e.key === "Enter") {
               // Форма не должна улетать на сервер от Enter в поиске станции.
               e.preventDefault();
-              if (suggestions[0]) add(suggestions[0].name);
+              if (suggestions[0]) add(suggestions[0]);
             }
           }}
-          placeholder={full ? "Достаточно станций" : "Начните вводить: Тверская"}
+          placeholder={full ? "Достаточно станций" : "Начните вводить название станции"}
           autoComplete="off"
         />
 
@@ -107,7 +134,7 @@ export function MetroPicker({
               <li key={`${s.name}-${s.line}`}>
                 <button
                   type="button"
-                  onClick={() => add(s.name)}
+                  onClick={() => add(s)}
                   className="w-full text-left px-3 py-2 hover:bg-ink-50 flex items-center gap-2"
                 >
                   <span

@@ -15,8 +15,18 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const HH_URL = "https://api.hh.ru/metro";
-// Пока нанимают в Москве. Новый город — одна строка здесь и пересборка файла.
-const CITIES = ["Москва"];
+// Все города РФ, где есть метро. Справочник — запасной путь на случай,
+// когда DaData недоступна или ключ не задан; основной источник подсказок в
+// формах — suggest/metro DaData.
+const CITIES = [
+  "Москва",
+  "Санкт-Петербург",
+  "Нижний Новгород",
+  "Новосибирск",
+  "Самара",
+  "Екатеринбург",
+  "Казань",
+];
 
 function normalise(s) {
   return s.toLowerCase().replace(/ё/g, "е").trim();
@@ -33,11 +43,13 @@ async function main() {
   if (!res.ok) throw new Error(`hh.ru ответил ${res.status}`);
   const cities = await res.json();
 
-  const stations = [];
+  const byCity = {};
+  let total = 0;
   for (const cityName of CITIES) {
     const city = cities.find((c) => c.name === cityName);
     if (!city) throw new Error(`Города «${cityName}» нет в ответе hh.ru`);
 
+    const stations = [];
     for (const line of city.lines) {
       const color = `#${String(line.hex_color).replace(/^#/, "").toUpperCase()}`;
       if (!/^#[0-9A-F]{6}$/.test(color)) {
@@ -52,32 +64,39 @@ async function main() {
         });
       }
     }
+
+    // Пересадочные узлы: одно имя встречается на нескольких линиях
+    // (Комсомольская, Китай-город). Оставляем первое вхождение.
+    const seen = new Set();
+    const unique = stations.filter((s) => {
+      const key = normalise(s.name);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    unique.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    byCity[cityName] = unique;
+    total += unique.length;
   }
 
-  // Пересадочные узлы: одно имя встречается на нескольких линиях
-  // (Комсомольская, Китай-город). Оставляем первое вхождение.
-  const seen = new Set();
-  const unique = stations.filter((s) => {
-    const key = normalise(s.name);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  unique.sort((a, b) => a.name.localeCompare(b.name, "ru"));
-
   const generatedAt = new Date().toISOString().slice(0, 10);
-  const body = unique
-    .map(
-      (s) =>
-        `  { name: ${tsString(s.name)}, line: ${tsString(s.line)}, color: ${tsString(s.color)} },`,
-    )
+  const body = Object.entries(byCity)
+    .map(([city, list]) => {
+      const rows = list
+        .map(
+          (s) =>
+            `    { name: ${tsString(s.name)}, line: ${tsString(s.line)}, color: ${tsString(s.color)} },`,
+        )
+        .join("\n");
+      return `  ${tsString(city)}: [\n${rows}\n  ],`;
+    })
     .join("\n");
 
   const here = dirname(fileURLToPath(import.meta.url));
   await writeFile(
     join(here, "..", "lib", "data", "metro-stations.generated.ts"),
     `// СГЕНЕРИРОВАННЫЙ ФАЙЛ — не править руками.
-// Источник: ${HH_URL} (${CITIES.join(", ")}), собрано ${generatedAt}.
+// Источник: ${HH_URL} (города РФ с метро), собрано ${generatedAt}.
 // Пересобрать: node scripts/build-metro-dict.mjs
 
 export interface MetroStation {
@@ -88,14 +107,17 @@ export interface MetroStation {
   color: string;
 }
 
-export const METRO_STATIONS: MetroStation[] = [
+export const METRO_STATIONS_BY_CITY: Record<string, MetroStation[]> = {
 ${body}
-];
+};
+
+/** Города, где метро есть вообще: в остальных поле станций не показываем. */
+export const METRO_CITIES = Object.keys(METRO_STATIONS_BY_CITY);
 `,
     "utf8",
   );
 
-  console.log(`Готово: ${unique.length} станций (${CITIES.join(", ")})`);
+  console.log(`Готово: ${total} станций, городов ${CITIES.length}`);
 }
 
 main().catch((e) => {

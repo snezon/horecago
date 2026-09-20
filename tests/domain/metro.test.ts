@@ -1,81 +1,107 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
-  searchStations,
-  parseMetroSelection,
-  findStation,
-  MAX_METRO_STATIONS,
+  searchStationsOffline,
+  findStationOffline,
+  cityHasMetro,
+  resolveStations,
+  METRO_CITIES,
 } from "@/lib/domain/metro";
 
-describe("searchStations", () => {
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
+describe("свой справочник", () => {
+  it("знает все города РФ с метро", () => {
+    expect(METRO_CITIES).toEqual([
+      "Москва",
+      "Санкт-Петербург",
+      "Нижний Новгород",
+      "Новосибирск",
+      "Самара",
+      "Екатеринбург",
+      "Казань",
+    ]);
+    expect(cityHasMetro("казань")).toBe(true);
+    expect(cityHasMetro("Краснодар")).toBe(false);
+  });
+
+  it("ищет станции в пределах города", () => {
+    expect(searchStationsOffline("Казань", "авиа").map((s) => s.name)).toContain(
+      "Авиастроительная",
+    );
+    expect(searchStationsOffline("Москва", "авиа").map((s) => s.name)).toContain(
+      "Авиамоторная",
+    );
+    // «Авиамоторной» в Казани нет — города не перемешиваются.
+    expect(
+      searchStationsOffline("Казань", "авиа").map((s) => s.name),
+    ).not.toContain("Авиамоторная");
+  });
+
   it("совпадение с начала названия идёт выше совпадения в середине", () => {
-    const names = searchStations("парк").map((s) => s.name);
-    expect(names[0]).toBe("Парк культуры");
-    expect(names).toContain("Технопарк");
+    const names = searchStationsOffline("Москва", "парк").map((s) => s.name);
     expect(names.indexOf("Парк культуры")).toBeLessThan(names.indexOf("Технопарк"));
   });
 
-  it("регистр и ё не мешают", () => {
-    expect(searchStations("ЩЁЛКОВСКАЯ").map((s) => s.name)).toContain("Щелковская");
-    expect(searchStations("щелковская").map((s) => s.name)).toContain("Щелковская");
-  });
-
-  it("пустой запрос не подсказывает ничего", () => {
-    expect(searchStations("  ")).toEqual([]);
-  });
-
-  it("у станции есть ветка и цвет — их видно в подсказке", () => {
-    const [first] = searchStations("Тверская");
-    expect(first.line).toBe("Замоскворецкая");
-    expect(first.color).toMatch(/^#[0-9A-F]{6}$/);
+  it("находит станцию по неточному написанию", () => {
+    expect(findStationOffline("Москва", "  м. щёлковская ")?.name).toBe(
+      "Щелковская",
+    );
   });
 });
 
-describe("parseMetroSelection", () => {
-  it("приводит к написанию справочника", () => {
-    expect(parseMetroSelection("тверская, КИТАЙ-ГОРОД")).toEqual([
+describe("resolveStations", () => {
+  it("приводит к написанию справочника, не трогая сеть", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(resolveStations("Москва", "тверская, КИТАЙ-ГОРОД")).resolves.toEqual([
       "Тверская",
       "Китай-город",
     ]);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("выбрасывает то, чего нет в справочнике", () => {
-    expect(parseMetroSelection("Тверская, Хогвартс, улица Правды 7")).toEqual([
-      "Тверская",
-    ]);
+  it("незнакомую станцию спрашивает у DaData и берёт её написание", async () => {
+    vi.stubEnv("DADATA_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          suggestions: [
+            { data: { name: "Новая", line_name: "Первая", color: "AABBCC", city: "Пермь" } },
+          ],
+        }),
+      ),
+    );
+
+    await expect(resolveStations("Пермь", "новая")).resolves.toEqual(["Новая"]);
   });
 
-  it("понимает прежнюю запись с приставкой «м.»", () => {
-    expect(parseMetroSelection("м. Маяковская, м. Курская")).toEqual([
-      "Маяковская",
-      "Курская",
-    ]);
+  it("станцию, которой нет и у DaData, выбрасывает", async () => {
+    vi.stubEnv("DADATA_API_KEY", "test-key");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ suggestions: [] })));
+
+    await expect(resolveStations("Пермь", "Хогвартс")).resolves.toEqual([]);
   });
 
-  it("повторы схлопываются", () => {
-    expect(parseMetroSelection("Тверская, тверская")).toEqual(["Тверская"]);
+  it("если DaData недоступна — сохраняем ввод, а не теряем его", async () => {
+    vi.stubEnv("DADATA_API_KEY", "test-key");
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("сеть лежит");
+    }));
+
+    await expect(resolveStations("Пермь", "Новая")).resolves.toEqual(["Новая"]);
   });
 
-  it("больше лимита не сохраняем", () => {
-    const many = Array.from({ length: 20 }, (_, i) => `Станция ${i}`);
-    const real = ["Тверская", "Китай-город", "Сокол", "Динамо", "Курская",
-      "Таганская", "Полянка", "Отрадное", "Аэропорт", "Бауманская", "Смоленская"];
-    const parsed = parseMetroSelection([...real, ...many].join(","));
-    expect(parsed).toHaveLength(MAX_METRO_STATIONS);
-  });
+  it("без ключа незнакомый город оставляем как ввели", async () => {
+    vi.stubEnv("DADATA_API_KEY", "");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
 
-  it("пустая строка — пустой выбор", () => {
-    expect(parseMetroSelection("")).toEqual([]);
-  });
-});
-
-describe("findStation", () => {
-  it("находит по неточному написанию", () => {
-    expect(findStation("  щёлковская  ")?.name).toBe("Щелковская");
-  });
-
-  it("срезает приставку «м.» и «метро» — так писали до справочника", () => {
-    expect(findStation("м. Маяковская")?.name).toBe("Маяковская");
-    expect(findStation("м Маяковская")?.name).toBe("Маяковская");
-    expect(findStation("метро Маяковская")?.name).toBe("Маяковская");
+    await expect(resolveStations("Пермь", "Новая")).resolves.toEqual(["Новая"]);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

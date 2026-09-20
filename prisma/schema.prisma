@@ -63,6 +63,7 @@ model HRProfile {
 model WorkerProfile {
   userId           String   @id
   about            String?
+  city             String?  // город работы
   metro            String?  // станции метро, удобные для работы — со слов работника
   minPayment       Int?     // мин. ставка ₽ за смену (для лентыHR)
   isLookingForWork Boolean  @default(true) // показывать ли в /workers
