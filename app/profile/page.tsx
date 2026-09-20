@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { toDateInput } from "@/lib/datetime";
+import { MetroPicker } from "@/app/_components/MetroPicker";
 import { FileText, Trash2, Upload, ExternalLink, Lock } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -51,7 +52,7 @@ export default async function ProfilePage() {
           </div>
           <div>
             <label className="label">Укажите станции метро, удобные для работы</label>
-            <input name="metro" className="input" defaultValue={user.workerProfile?.metro ?? ""} placeholder="Тверская, Китай-город, Павелецкая" />
+            <MetroPicker name="metro" defaultValue={user.workerProfile?.metro ?? ""} />
           </div>
           <div>
             <label className="label">О себе</label>

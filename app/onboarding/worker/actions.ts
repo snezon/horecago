@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { hasConsent, needsConsentCheckbox, recordConsent } from "@/lib/domain/consent";
 import { resolveMedBook } from "@/lib/domain/med-book";
+import { formatMetroSelection, parseMetroSelection } from "@/lib/domain/metro";
 
 export async function saveWorkerOnboarding(formData: FormData) {
   const user = await requireUser();
@@ -18,7 +19,9 @@ export async function saveWorkerOnboarding(formData: FormData) {
 
   const name = String(formData.get("name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const metro = String(formData.get("metro") ?? "").trim();
+  const metro = formatMetroSelection(
+    parseMetroSelection(String(formData.get("metro") ?? "")),
+  );
   const about = String(formData.get("about") ?? "").trim();
   const minPaymentRaw = String(formData.get("minPayment") ?? "").trim();
   const minPayment = minPaymentRaw ? Math.max(0, Number(minPaymentRaw)) : null;
