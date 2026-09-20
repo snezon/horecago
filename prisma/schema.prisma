@@ -64,6 +64,7 @@ model WorkerProfile {
   userId           String   @id
   about            String?
   city             String?  // город работы
+  cityKey          String?  // город в нижнем регистре — по нему ищут, SQLite не сравнивает кириллицу без учёта регистра
   metro            String?  // станции метро, удобные для работы — со слов работника
   minPayment       Int?     // мин. ставка ₽ за смену (для лентыHR)
   isLookingForWork Boolean  @default(true) // показывать ли в /workers
@@ -74,6 +75,22 @@ model WorkerProfile {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   skills           WorkerSkill[]
   documents        Document[]
+  metroStations    WorkerMetro[]
+
+  @@index([cityKey])
+}
+
+/// Станции работника по одной строке на станцию: поиск «кто рядом с Тверской»
+/// должен быть запросом к базе, а не перебором строк в приложении.
+model WorkerMetro {
+  workerId   String
+  stationKey String // нормализованное имя: нижний регистр, ё→е, без приставки «м.»
+  name       String // как показываем человеку
+
+  worker WorkerProfile @relation(fields: [workerId], references: [userId], onDelete: Cascade)
+
+  @@id([workerId, stationKey])
+  @@index([stationKey])
 }
 
 model Position {

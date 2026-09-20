@@ -1,5 +1,5 @@
-import { isMedBookExpired } from "@/lib/domain/med-book";
-import { sanitizeMetroInput, stationKey } from "@/lib/domain/metro-input";
+import type { Prisma } from "@prisma/client";
+import { cityKeyOf, metroKeysOf } from "@/lib/domain/worker-index";
 
 export interface WorkerFilters {
   city: string | null;
@@ -11,15 +11,6 @@ export interface WorkerFilters {
   maxPayment: number | null;
 }
 
-export interface FilterableProfile {
-  city: string | null;
-  metro: string | null;
-  hasMedBook: boolean;
-  medBookExpiresAt: Date | null;
-  hasWorkPermit: boolean;
-  minPayment: number | null;
-}
-
 export const EMPTY_FILTERS: WorkerFilters = {
   city: null,
   metro: null,
@@ -27,53 +18,6 @@ export const EMPTY_FILTERS: WorkerFilters = {
   workPermit: false,
   maxPayment: null,
 };
-
-export function hasAnyFilter(f: WorkerFilters): boolean {
-  return Boolean(
-    f.city?.trim() || f.metro?.trim() || f.medBook || f.workPermit || f.maxPayment,
-  );
-}
-
-/**
- * Отбор соискателей по условиям заказчика или агентства. Незаданное условие
- * никого не отсеивает — фильтр без ответа хуже, чем широкий список.
- *
- * `on` — дата, к которой медкнижка должна действовать: при подборе под смену
- * это дата смены, в обычном поиске — сегодня.
- */
-export function matchesFilters(
-  profile: FilterableProfile | null | undefined,
-  filters: WorkerFilters,
-  on: Date,
-): boolean {
-  if (!profile) return false;
-
-  if (filters.city?.trim()) {
-    const wanted = filters.city.trim().toLowerCase();
-    if ((profile.city ?? "").trim().toLowerCase() !== wanted) return false;
-  }
-
-  if (filters.metro?.trim()) {
-    const wanted = new Set(sanitizeMetroInput(filters.metro).map(stationKey));
-    const has = sanitizeMetroInput(profile.metro ?? "").some((s) =>
-      wanted.has(stationKey(s)),
-    );
-    if (!has) return false;
-  }
-
-  if (filters.medBook) {
-    if (!profile.hasMedBook) return false;
-    if (isMedBookExpired(profile.medBookExpiresAt, on)) return false;
-  }
-
-  if (filters.workPermit && !profile.hasWorkPermit) return false;
-
-  if (filters.maxPayment != null && profile.minPayment != null) {
-    if (profile.minPayment > filters.maxPayment) return false;
-  }
-
-  return true;
-}
 
 /** Фильтры из строки запроса — общий разбор для заказчика и агентства. */
 export function filtersFromParams(params: {
@@ -89,4 +33,56 @@ export function filtersFromParams(params: {
     workPermit: params.permit === "1",
     maxPayment: null,
   };
+}
+
+/**
+ * Условия отбора как запрос к базе, а не перебор в приложении: город и станции
+ * лежат нормализованными (см. worker-index), поэтому фильтр переживёт рост
+ * базы и не зависит от того, как SQLite сравнивает кириллицу.
+ *
+ * `on` — дата, к которой медкнижка должна действовать: при подборе под смену
+ * это дата смены, в обычном поиске — сегодня.
+ */
+export function workerFilterWhere(
+  filters: WorkerFilters,
+  on: Date,
+): Prisma.WorkerProfileWhereInput {
+  const where: Prisma.WorkerProfileWhereInput = {};
+
+  const cityKey = cityKeyOf(filters.city);
+  if (cityKey) where.cityKey = cityKey;
+
+  const stations = metroKeysOf(filters.metro).map((s) => s.stationKey);
+  if (stations.length > 0) {
+    where.metroStations = { some: { stationKey: { in: stations } } };
+  }
+
+  if (filters.medBook) {
+    where.hasMedBook = true;
+    // Срок может быть не указан вовсе — это «книжка есть, дату не назвал»,
+    // а не «просрочена»: отсеивать такого человека фильтр не должен.
+    where.OR = [
+      { medBookExpiresAt: null },
+      { medBookExpiresAt: { gte: startOfDay(on) } },
+    ];
+  }
+
+  if (filters.workPermit) where.hasWorkPermit = true;
+
+  if (filters.maxPayment != null) {
+    where.AND = [
+      {
+        OR: [
+          { minPayment: null },
+          { minPayment: { lte: filters.maxPayment } },
+        ],
+      },
+    ];
+  }
+
+  return where;
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }

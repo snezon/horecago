@@ -9,6 +9,7 @@
  * Горизонт: DEMO_END=2027-06-30 npx tsx prisma/seed-demo.ts
  */
 import { PrismaClient } from "@prisma/client";
+import { reindexWorker } from "../lib/domain/worker-index";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -322,6 +323,7 @@ async function main() {
         },
       },
     });
+    await reindexWorker(u.id, "Москва", w.metro);
     workerIds.push(u.id);
     workerPositions.push(new Set(w.positions));
   }

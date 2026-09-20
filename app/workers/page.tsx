@@ -11,7 +11,7 @@ import { agencyLabel } from "@/lib/agency-label";
 import { WorkerFiltersForm } from "@/app/_components/WorkerFilters";
 import {
   filtersFromParams,
-  matchesFilters,
+  workerFilterWhere,
   type WorkerFilters,
 } from "@/lib/domain/worker-filter";
 
@@ -95,14 +95,13 @@ export default async function WorkersPage({
     : filtersFromParams(searchParams);
   const matchOn = shift ? shift.shiftStart : new Date();
 
-  const found = await prisma.user.findMany({
+  const workers = await prisma.user.findMany({
     where: {
       role: "WORKER",
       workerProfile: {
         isLookingForWork: true,
-        ...(filter
-          ? { skills: { some: { positionId: filter } } }
-          : {}),
+        ...(filter ? { skills: { some: { positionId: filter } } } : {}),
+        ...workerFilterWhere(filters, matchOn),
       },
     },
     include: {
@@ -116,11 +115,6 @@ export default async function WorkersPage({
     take: WORKERS_LIMIT,
   });
 
-  // Город и станции лежат строками, поэтому сверяем их в коде: SQLite не умеет
-  // сравнивать кириллицу без учёта регистра, а список ограничен сверху.
-  const workers = found.filter((w) =>
-    matchesFilters(w.workerProfile, filters, matchOn),
-  );
 
   const agencyMap = await representingAgencies(workers.map((w) => w.id));
 

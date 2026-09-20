@@ -8,7 +8,7 @@ import { formatRub } from "@/lib/datetime";
 import { locationLine } from "@/lib/domain/location";
 import { AccessBadges } from "@/app/_components/AccessBadges";
 import { WorkerFiltersForm } from "@/app/_components/WorkerFilters";
-import { filtersFromParams, matchesFilters } from "@/lib/domain/worker-filter";
+import { filtersFromParams, workerFilterWhere } from "@/lib/domain/worker-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +35,21 @@ export default async function AgencyWorkersPage({
   const positionId = searchParams.position ? Number(searchParams.position) : null;
   const filters = filtersFromParams(searchParams);
 
-  const reps = await prisma.representation.findMany({
+  const total = await prisma.representation.count({
     where: { agencyId, status: "ACTIVE" },
+  });
+
+  const reps = await prisma.representation.findMany({
+    where: {
+      agencyId,
+      status: "ACTIVE",
+      worker: {
+        workerProfile: {
+          ...workerFilterWhere(filters, new Date()),
+          ...(positionId ? { skills: { some: { positionId } } } : {}),
+        },
+      },
+    },
     include: {
       worker: {
         include: {
@@ -47,14 +60,7 @@ export default async function AgencyWorkersPage({
     take: WORKERS_LIMIT,
   });
 
-  const workers = reps
-    .map((r) => r.worker)
-    .filter((w) => matchesFilters(w.workerProfile, filters, new Date()))
-    .filter(
-      (w) =>
-        !positionId ||
-        w.workerProfile?.skills.some((s) => s.positionId === positionId),
-    );
+  const workers = reps.map((r) => r.worker);
 
   return (
     <div className="space-y-6">
@@ -65,7 +71,7 @@ export default async function AgencyWorkersPage({
       <div>
         <h1 className="text-3xl font-bold text-ink-900 mb-1">Наши работники</h1>
         <p className="text-ink-500">
-          {workers.length} из {reps.length} подходят под отбор
+          {workers.length} из {total} подходят под отбор
         </p>
       </div>
 
@@ -92,7 +98,7 @@ export default async function AgencyWorkersPage({
 
       {workers.length === 0 ? (
         <div className="card text-center text-ink-500 py-12">
-          {reps.length === 0
+          {total === 0
             ? "У агентства пока нет подтверждённых работников"
             : "Под этот отбор никто не подходит"}
         </div>

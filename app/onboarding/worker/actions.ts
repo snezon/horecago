@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { hasConsent, needsConsentCheckbox, recordConsent } from "@/lib/domain/consent";
 import { resolveMedBook } from "@/lib/domain/med-book";
 import { resolveStations } from "@/lib/domain/metro";
+import { reindexWorker } from "@/lib/domain/worker-index";
 import { formatMetroSelection } from "@/lib/domain/metro-input";
 
 export async function saveWorkerOnboarding(formData: FormData) {
@@ -40,6 +41,7 @@ export async function saveWorkerOnboarding(formData: FormData) {
     update: { city, metro, about, minPayment, hasMedBook, medBookExpiresAt, hasWorkPermit },
     create: { userId: user.id, city, metro, about, minPayment, hasMedBook, medBookExpiresAt, hasWorkPermit },
   });
+  await reindexWorker(user.id, city, metro);
   await prisma.workerSkill.deleteMany({ where: { workerId: user.id } });
   if (skills.length) {
     await prisma.workerSkill.createMany({
