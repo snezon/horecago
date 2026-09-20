@@ -4,6 +4,7 @@ const prisma = new PrismaClient();
 
 const POSITIONS = [
   "Горничная",
+  "Клинер",
   "Официант",
   "Бармен",
   "Бариста",

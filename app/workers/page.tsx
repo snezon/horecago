@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPin, Wallet, Calendar } from "lucide-react";
+import { MapPin, Wallet } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatRub } from "@/lib/datetime";
@@ -104,12 +104,6 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
                       <div className="flex items-center gap-2 text-ink-900 font-medium">
                         <Wallet className="w-3.5 h-3.5 text-accent-500 shrink-0" />
                         от {formatRub(w.workerProfile.minPayment)} ₽ за смену
-                      </div>
-                    )}
-                    {w.workerProfile?.availabilityNote && (
-                      <div className="flex items-center gap-2 text-ink-700">
-                        <Calendar className="w-3.5 h-3.5 text-ink-400 shrink-0" />
-                        <span className="truncate">{w.workerProfile.availabilityNote}</span>
                       </div>
                     )}
                   </div>

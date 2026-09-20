@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  ArrowLeft, MapPin, Wallet, Calendar, FileText, Phone, Mail, CheckCircle2, AlertTriangle,
+  ArrowLeft, MapPin, Wallet, FileText, Phone, Mail, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -109,15 +109,6 @@ export default async function WorkerPage({
               <div>
                 <div className="text-xs text-ink-500">Мин. ставка</div>
                 <div className="text-sm font-semibold text-ink-900">от {formatRub(worker.workerProfile.minPayment)} ₽ за смену</div>
-              </div>
-            </div>
-          )}
-          {worker.workerProfile.availabilityNote && (
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-ink-50/70">
-              <Calendar className="w-4 h-4 text-accent-500 mt-0.5" />
-              <div>
-                <div className="text-xs text-ink-500">Доступность</div>
-                <div className="text-sm text-ink-800">{worker.workerProfile.availabilityNote}</div>
               </div>
             </div>
           )}

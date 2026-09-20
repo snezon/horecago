@@ -21,14 +21,13 @@ export async function saveWorkerOnboarding(formData: FormData) {
   const about = String(formData.get("about") ?? "").trim();
   const minPaymentRaw = String(formData.get("minPayment") ?? "").trim();
   const minPayment = minPaymentRaw ? Math.max(0, Number(minPaymentRaw)) : null;
-  const availabilityNote = String(formData.get("availabilityNote") ?? "").trim() || null;
   const skills = formData.getAll("skills").map((v) => Number(v)).filter(Boolean);
 
   await prisma.user.update({ where: { id: user.id }, data: { name, phone } });
   await prisma.workerProfile.upsert({
     where: { userId: user.id },
-    update: { address, about, minPayment, availabilityNote },
-    create: { userId: user.id, address, about, minPayment, availabilityNote },
+    update: { address, about, minPayment },
+    create: { userId: user.id, address, about, minPayment },
   });
   await prisma.workerSkill.deleteMany({ where: { workerId: user.id } });
   if (skills.length) {
