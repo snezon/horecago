@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { AccessBadges } from "@/app/_components/AccessBadges";
 import { inviteWorker } from "./actions";
 import { shiftLabel, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
@@ -91,14 +92,15 @@ export default async function WorkerPage({
           </div>
           <div>
             <h1 className="text-2xl font-bold text-ink-900">{worker.name ?? "Без имени"}</h1>
-            {worker.workerProfile.address && (
+            {worker.workerProfile.metro && (
               <div className="flex items-center gap-1.5 text-sm text-ink-500 mt-0.5">
-                <MapPin className="w-3.5 h-3.5" /> {worker.workerProfile.address}
+                <MapPin className="w-3.5 h-3.5" /> {worker.workerProfile.metro}
               </div>
             )}
             {agencies.length > 0 && (
               <span className="badge-muted mt-1.5 inline-block">{agencyLabel(agencies)}</span>
             )}
+            <AccessBadges profile={worker.workerProfile} className="mt-2" />
           </div>
         </div>
 

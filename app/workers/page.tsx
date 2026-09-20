@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MapPin, Wallet } from "lucide-react";
+import { AccessBadges } from "@/app/_components/AccessBadges";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatRub } from "@/lib/datetime";
@@ -74,13 +75,15 @@ export default async function WorkersPage({ searchParams }: { searchParams: { po
                     </div>
                     <div className="min-w-0">
                       <div className="font-semibold text-ink-900 truncate">{w.name ?? "Без имени"}</div>
-                      {w.workerProfile?.address && (
+                      {w.workerProfile?.metro && (
                         <div className="flex items-center gap-1 text-xs text-ink-500">
-                          <MapPin className="w-3 h-3" /> {w.workerProfile.address}
+                          <MapPin className="w-3 h-3" /> {w.workerProfile.metro}
                         </div>
                       )}
                     </div>
                   </div>
+
+                  <AccessBadges profile={w.workerProfile} className="mb-3" />
 
                   {skills.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-3">

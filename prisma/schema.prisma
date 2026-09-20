@@ -63,9 +63,13 @@ model HRProfile {
 model WorkerProfile {
   userId           String   @id
   about            String?
-  address          String?
+  metro            String?  // станции метро, удобные для работы — со слов работника
   minPayment       Int?     // мин. ставка ₽ за смену (для лентыHR)
   isLookingForWork Boolean  @default(true) // показывать ли в /workers
+  // Допуск со слов работника: площадка его не проверяет, скан — отдельно в Document
+  hasMedBook       Boolean  @default(false)
+  medBookExpiresAt DateTime?
+  hasWorkPermit    Boolean  @default(false) // разрешение на работу в РФ (для не граждан)
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   skills           WorkerSkill[]
   documents        Document[]

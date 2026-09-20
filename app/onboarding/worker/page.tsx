@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { toDateInput } from "@/lib/datetime";
 import { saveWorkerOnboarding } from "./actions";
 
 export default async function WorkerOnboardingPage({
@@ -44,8 +45,8 @@ export default async function WorkerOnboardingPage({
           </div>
         </div>
         <div>
-          <label className="label">Адрес (район или станция метро)</label>
-          <input name="address" className="input" defaultValue={user.workerProfile?.address ?? ""} placeholder="м. Тверская" />
+          <label className="label">Укажите станции метро, удобные для работы</label>
+          <input name="metro" className="input" defaultValue={user.workerProfile?.metro ?? ""} placeholder="Тверская, Китай-город, Павелецкая" />
         </div>
         <div>
           <label className="label">О себе</label>
@@ -71,6 +72,27 @@ export default async function WorkerOnboardingPage({
               </label>
             ))}
           </div>
+        </div>
+        <div className="rounded-xl border border-ink-200 p-4 space-y-3">
+          <div className="text-sm font-semibold text-ink-900">Допуск к работе</div>
+          <label className="flex items-start gap-2.5 text-sm text-ink-700">
+            <input type="checkbox" name="hasMedBook" value="1" defaultChecked={user.workerProfile?.hasMedBook ?? false} className="accent-ink-900 mt-0.5" />
+            <span>Есть медицинская книжка</span>
+          </label>
+          <div className="sm:max-w-[220px]">
+            <label className="label">Медкнижка действует до</label>
+            <input
+              type="date"
+              name="medBookExpiresAt"
+              className="input"
+              defaultValue={user.workerProfile?.medBookExpiresAt ? toDateInput(user.workerProfile.medBookExpiresAt) : ""}
+            />
+          </div>
+          <label className="flex items-start gap-2.5 text-sm text-ink-700">
+            <input type="checkbox" name="hasWorkPermit" value="1" defaultChecked={user.workerProfile?.hasWorkPermit ?? false} className="accent-ink-900 mt-0.5" />
+            <span>Есть разрешение на работу в РФ — если вы не гражданин РФ</span>
+          </label>
+          <p className="text-xs text-ink-500">Заказчик видит это как ваши слова. Скан можно приложить в профиле, в разделе «Документы».</p>
         </div>
         <label className="flex items-start gap-2.5 text-sm text-ink-700">
           <input type="checkbox" name="consent" value="1" required className="accent-ink-900 mt-0.5" />

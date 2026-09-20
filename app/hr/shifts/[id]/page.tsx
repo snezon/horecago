@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { AccessBadges } from "@/app/_components/AccessBadges";
 import { updateShift, hireApplicant, rejectApplicant } from "../actions";
 import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
@@ -251,14 +252,15 @@ export default async function HRShiftPage({
                         </div>
                         <div>
                           <div className="font-semibold text-ink-900">{a.worker.name ?? "Без имени"}</div>
-                          {a.worker.workerProfile?.address && (
+                          {a.worker.workerProfile?.metro && (
                             <div className="flex items-center gap-1 text-xs text-ink-500">
-                              <MapPin className="w-3 h-3" /> {a.worker.workerProfile.address}
+                              <MapPin className="w-3 h-3" /> {a.worker.workerProfile.metro}
                             </div>
                           )}
                           {agencies.length > 0 && (
                             <span className="badge-muted mt-1 inline-block">{agencyLabel(agencies)}</span>
                           )}
+                          <AccessBadges profile={a.worker.workerProfile} className="mt-1" />
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-3 text-sm">

@@ -46,6 +46,11 @@ export function toLocalInput(d: Date): string {
   return `${y}-${m}-${day}T${h}:${min}`;
 }
 
+/** Дата для input[type="date"] — "2027-03-12" по местному календарю */
+export function toDateInput(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** Форматирует ₽ "4 500" */
 export function formatRub(n: number): string {
   return n.toLocaleString("ru-RU");
