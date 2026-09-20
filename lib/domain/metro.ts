@@ -12,8 +12,16 @@ export function stationKey(name: string): string {
   return name.toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Люди (и прежние профили) пишут станцию с приставкой — «м. Тверская»,
+ * «метро Тверская». Приставку срезаем, иначе выбор из справочника молча
+ * терял бы всё, что было введено руками до его появления.
+ */
+const PREFIX_RE = /^(?:м\.?|метро)\s+/;
+
 export function findStation(name: string): MetroStation | undefined {
-  return byKey.get(stationKey(name));
+  const key = stationKey(name);
+  return byKey.get(key) ?? byKey.get(key.replace(PREFIX_RE, "").trim());
 }
 
 /**

@@ -39,8 +39,15 @@ describe("parseMetroSelection", () => {
   });
 
   it("выбрасывает то, чего нет в справочнике", () => {
-    expect(parseMetroSelection("Тверская, м. Тверская 7, Хогвартс")).toEqual([
+    expect(parseMetroSelection("Тверская, Хогвартс, улица Правды 7")).toEqual([
       "Тверская",
+    ]);
+  });
+
+  it("понимает прежнюю запись с приставкой «м.»", () => {
+    expect(parseMetroSelection("м. Маяковская, м. Курская")).toEqual([
+      "Маяковская",
+      "Курская",
     ]);
   });
 
@@ -64,5 +71,11 @@ describe("parseMetroSelection", () => {
 describe("findStation", () => {
   it("находит по неточному написанию", () => {
     expect(findStation("  щёлковская  ")?.name).toBe("Щелковская");
+  });
+
+  it("срезает приставку «м.» и «метро» — так писали до справочника", () => {
+    expect(findStation("м. Маяковская")?.name).toBe("Маяковская");
+    expect(findStation("м Маяковская")?.name).toBe("Маяковская");
+    expect(findStation("метро Маяковская")?.name).toBe("Маяковская");
   });
 });
