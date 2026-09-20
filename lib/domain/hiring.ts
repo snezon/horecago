@@ -6,9 +6,9 @@ export type HireResult = "HIRED" | "NO_SEATS" | "NOT_FOUND" | "ALREADY";
  * Нанимает по отклику. Место занимается условным обновлением: если счётчик
  * изменился между чтением и записью, обновление не проходит и мы пробуем снова.
  * Без этого два одновременных найма на последнее место брали обоих.
- * Счётчик занятых мест (`hiredCount`) изменяется только в этой функции; статус
- * смены («OPEN»/«CLOSED») приводится в соответствие фактическому счётчику
- * только функцией `syncShiftStatus` ниже.
+ * Счётчик занятых мест (`hiredCount`) меняют только две функции этого файла:
+ * эта (занимает место) и `releaseHire` (возвращает своё же). Статус смены
+ * («OPEN»/«CLOSED») приводится к фактическому счётчику в `syncShiftStatus`.
  */
 export async function hireApplication(
   applicationId: string,
@@ -50,9 +50,8 @@ export async function hireApplication(
       // единицу без условия безопасно только потому, что мы только что сами
       // это место заняли (см. claimed выше) и hiredCount правит исключительно
       // hireApplication — откатываем гарантированно своё занятие, а не чужое.
-      // Если у счётчика появится другой писатель (массовая операция в админке,
-      // ручная правка смены), это допущение и принудительный статус "OPEN"
-      // ниже станут неверны.
+      // Второй писатель счётчика — releaseHire ниже; он тоже уменьшает ровно
+      // своё, уже выигранное, место, поэтому допущение сохраняется.
       await prisma.shift.updateMany({
         where: { id: shift.id },
         data: { hiredCount: { decrement: 1 }, status: "OPEN" },
@@ -94,4 +93,39 @@ export async function syncShiftStatus(shiftId: string): Promise<SyncStatusResult
     if (!shift) return "NOT_FOUND";
   }
   return shift.hiredCount >= shift.headcount ? "CLOSED" : "OPEN";
+}
+
+export type ReleaseResult = "RELEASED" | "NOT_HIRED" | "NOT_FOUND";
+
+/**
+ * Снимает найм: место возвращается в смену, отклик уходит в отказ.
+ *
+ * Порядок обратен найму и важен: сначала условным обновлением забираем сам
+ * отклик из состояния HIRED — выигравший эту гонку и есть тот, кто вправе
+ * вернуть место. Только после этого трогаем счётчик, поэтому одновременные
+ * снятия не уменьшат его дважды.
+ */
+export async function releaseHire(
+  applicationId: string,
+  expectHrId: string,
+): Promise<ReleaseResult> {
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: { shift: true },
+  });
+  if (!application) return "NOT_FOUND";
+  if (application.shift.hrId !== expectHrId) return "NOT_FOUND";
+  if (application.status !== "HIRED") return "NOT_HIRED";
+
+  const taken = await prisma.application.updateMany({
+    where: { id: applicationId, status: "HIRED" },
+    data: { status: "REJECTED" },
+  });
+  if (taken.count === 0) return "NOT_HIRED";
+
+  await prisma.shift.updateMany({
+    where: { id: application.shiftId },
+    data: { hiredCount: { decrement: 1 }, status: "OPEN" },
+  });
+  return "RELEASED";
 }

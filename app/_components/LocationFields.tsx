@@ -13,10 +13,14 @@ export function LocationFields({
   defaultCity,
   defaultMetro,
   metroCities,
+  metroLabel = "Укажите станции метро, удобные для работы",
+  metroHint,
 }: {
   defaultCity: string;
   defaultMetro: string;
   metroCities: string[];
+  metroLabel?: string;
+  metroHint?: string;
 }) {
   const [city, setCity] = useState(defaultCity);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -105,8 +109,8 @@ export function LocationFields({
 
       {hasMetro ? (
         <div>
-          <label className="label">Укажите станции метро, удобные для работы</label>
-          <MetroPicker name="metro" defaultValue={defaultMetro} city={city} />
+          <label className="label">{metroLabel}</label>
+          <MetroPicker name="metro" defaultValue={defaultMetro} city={city} hint={metroHint} />
         </div>
       ) : (
         // Станции без города не спрашиваем: в городе без метро поле бессмысленно,

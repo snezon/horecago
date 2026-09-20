@@ -9,6 +9,22 @@ import { getCurrentUser } from "@/lib/auth";
 import { applyToShift } from "./actions";
 import { shiftLabel, formatRub } from "@/lib/datetime";
 
+
+/** Условия смены человеческой строкой — работник должен понимать, за что борется. */
+function requirementsLine(shift: {
+  city: string | null;
+  metro: string | null;
+  requireMedBook: boolean;
+  requireWorkPermit: boolean;
+}): string {
+  const parts: string[] = [];
+  if (shift.city?.trim()) parts.push(shift.city.trim());
+  if (shift.metro?.trim()) parts.push(`метро ${shift.metro.trim()}`);
+  if (shift.requireMedBook) parts.push("действующая медкнижка");
+  if (shift.requireWorkPermit) parts.push("разрешение на работу");
+  return parts.join(", ");
+}
+
 export default async function ShiftPage({ params }: { params: { id: string } }) {
   const shift = await prisma.shift.findUnique({
     where: { id: params.id },
@@ -68,6 +84,20 @@ export default async function ShiftPage({ params }: { params: { id: string } }) 
           />
           <InfoRow icon={<MapPin className="w-4 h-4 text-ink-400" />} label="Адрес" value={shift.address} />
         </div>
+
+        {shift.autoHire && (
+          <div className="rounded-lg bg-ink-50 border border-ink-200/70 p-3 mb-6 text-sm text-ink-700">
+            <span className="font-medium text-ink-900">Работодатель нанимает автоматически.</span>{" "}
+            {shift.autoHireDoneAt
+              ? "Отклики уже разобраны: подходящие занимают оставшиеся места сразу."
+              : shift.autoHireDecideAt
+                ? `Решение — ${shift.autoHireDecideAt.toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}. До этого момента отклики собираются.`
+                : "Отклики собираются, решение примут до начала смены."}
+            {requirementsLine(shift) && (
+              <div className="text-ink-600 mt-1">Условия: {requirementsLine(shift)}.</div>
+            )}
+          </div>
+        )}
 
         <div className="border-t border-ink-200/70 pt-6">
           <h2 className="section-title mb-3">Описание</h2>

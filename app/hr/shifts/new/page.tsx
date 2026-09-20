@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { createShift } from "../actions";
 import { toLocalInput } from "@/lib/datetime";
+import { ShiftRequirementsFields } from "@/app/_components/ShiftRequirementsFields";
 
 export default async function NewShiftPage() {
   const user = await getCurrentUser();
@@ -81,6 +82,8 @@ export default async function NewShiftPage() {
           <label className="label">Адрес</label>
           <input name="address" className="input" required defaultValue={user.hrProfile.address} />
         </div>
+
+        <ShiftRequirementsFields />
 
         <button className="btn-primary w-full !py-3">Опубликовать</button>
       </form>

@@ -7,7 +7,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { AccessBadges } from "@/app/_components/AccessBadges";
 import { locationLine } from "@/lib/domain/location";
-import { updateShift, hireApplicant, rejectApplicant } from "../actions";
+import { updateShift, hireApplicant, rejectApplicant, releaseApplicant } from "../actions";
+import { ShiftRequirementsFields } from "@/app/_components/ShiftRequirementsFields";
+import { MatchBadge } from "@/app/_components/MatchBadge";
 import { shiftLabel, toLocalInput, formatRub } from "@/lib/datetime";
 import { representingAgencies } from "@/lib/domain/representation";
 import { agencyLabel } from "@/lib/agency-label";
@@ -94,6 +96,13 @@ function CandidateDocuments({
   );
 }
 
+
+/** «Авто-найм сегодня в 14:20» — заказчик должен видеть, когда решат за него. */
+function autoHireWhen(decideAt: Date | null): string {
+  if (!decideAt) return "включён";
+  return `решение ${decideAt.toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}`;
+}
+
 export default async function HRShiftPage({
   params,
   searchParams,
@@ -161,6 +170,13 @@ export default async function HRShiftPage({
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="badge-neutral">{shift.position.name}</span>
               {shift.status === "CLOSED" && <span className="badge-muted">Закрыта</span>}
+              {shift.autoHire && (
+                <span className="badge-warning">
+                  {shift.autoHireDoneAt
+                    ? "Авто-найм: добор подходящих"
+                    : `Авто-найм ${autoHireWhen(shift.autoHireDecideAt)}`}
+                </span>
+              )}
             </div>
             <h1 className="text-2xl font-bold">{shift.title}</h1>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-600 mt-2">
@@ -221,6 +237,7 @@ export default async function HRShiftPage({
               <label className="label">Адрес</label>
               <input name="address" defaultValue={shift.address} className="input" />
             </div>
+            <ShiftRequirementsFields values={shift} />
             <button className="btn-secondary">Сохранить</button>
           </form>
         </details>
@@ -296,6 +313,8 @@ export default async function HRShiftPage({
                     <p className="text-sm text-ink-700 mb-3 leading-relaxed">{a.worker.workerProfile.about}</p>
                   )}
 
+                  <MatchBadge shift={shift} profile={a.worker.workerProfile} />
+
                   {skills.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-3">
                       {skills.map((s) => (
@@ -327,10 +346,16 @@ export default async function HRShiftPage({
                     <div className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 shrink-0">
                       <CheckCircle2 className="w-4 h-4" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm truncate">{a.worker.name}</div>
                       <div className="text-xs text-ink-500">{a.worker.phone}</div>
                     </div>
+                    <form action={releaseApplicant}>
+                      <input type="hidden" name="appId" value={a.id} />
+                      <button className="btn-secondary !py-1 !px-2 text-xs" title="Снять найм — место вернётся в смену">
+                        Снять
+                      </button>
+                    </form>
                   </div>
                   <CandidateDocuments docs={wDocs} shiftStart={shift.shiftStart} urgent />
                 </li>

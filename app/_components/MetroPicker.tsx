@@ -25,10 +25,12 @@ export function MetroPicker({
   name,
   defaultValue,
   city,
+  hint,
 }: {
   name: string;
   defaultValue: string;
   city: string;
+  hint?: string;
 }) {
   const [selected, setSelected] = useState<string[]>(() =>
     sanitizeMetroInput(defaultValue),
@@ -152,7 +154,7 @@ export function MetroPicker({
       </div>
 
       <p className="text-xs text-ink-500 mt-1">
-        До {MAX_METRO_STATIONS} станций. Заказчик увидит их в вашем отклике.
+        {hint ?? `До ${MAX_METRO_STATIONS} станций. Заказчик увидит их в вашем отклике.`}
       </p>
     </div>
   );

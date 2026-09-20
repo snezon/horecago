@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma, resetDb } from "../helpers/db";
-import { hireApplication, syncShiftStatus } from "@/lib/domain/hiring";
+import { hireApplication, syncShiftStatus, releaseHire } from "@/lib/domain/hiring";
 
 async function setup(headcount: number) {
   const hr = await prisma.user.create({ data: { email: "hr@example.com", role: "HR" } });
@@ -137,5 +137,48 @@ describe("syncShiftStatus", () => {
     const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
     expect(fresh?.hiredCount).toBe(2);
     expect(fresh?.status).toBe("CLOSED");
+  });
+});
+
+describe("releaseHire", () => {
+  beforeEach(resetDb);
+
+  it("возвращает место в смену и открывает её заново", async () => {
+    const { hr, shift } = await setup(1);
+    const app = await addApplicant(shift.id, "a@example.com");
+    await hireApplication(app.id);
+
+    expect(await releaseHire(app.id, hr.id)).toBe("RELEASED");
+
+    const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
+    expect(fresh?.hiredCount).toBe(0);
+    expect(fresh?.status).toBe("OPEN");
+    const application = await prisma.application.findUnique({ where: { id: app.id } });
+    expect(application?.status).toBe("REJECTED");
+  });
+
+  it("чужую смену не трогает", async () => {
+    const { shift } = await setup(1);
+    const app = await addApplicant(shift.id, "a@example.com");
+    await hireApplication(app.id);
+    const stranger = await prisma.user.create({
+      data: { email: "stranger@example.com", role: "HR" },
+    });
+
+    expect(await releaseHire(app.id, stranger.id)).toBe("NOT_FOUND");
+    const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
+    expect(fresh?.hiredCount).toBe(1);
+  });
+
+  it("повторное снятие места не плодит", async () => {
+    const { hr, shift } = await setup(2);
+    const app = await addApplicant(shift.id, "a@example.com");
+    await hireApplication(app.id);
+
+    expect(await releaseHire(app.id, hr.id)).toBe("RELEASED");
+    expect(await releaseHire(app.id, hr.id)).toBe("NOT_HIRED");
+
+    const fresh = await prisma.shift.findUnique({ where: { id: shift.id } });
+    expect(fresh?.hiredCount).toBe(0);
   });
 });

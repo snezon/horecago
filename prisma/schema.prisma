@@ -120,12 +120,25 @@ model Shift {
   status      String   @default("OPEN") // "OPEN" | "CLOSED"
   createdAt   DateTime @default(now())
 
+  // Условия смены. Незаданное условие никого не отсеивает.
+  city             String?
+  metro            String?  // станции метро рядом со сменой
+  requireMedBook   Boolean  @default(false)
+  requireWorkPermit Boolean @default(false)
+
+  // Авто-найм: решение принимается один раз, в autoHireDecideAt.
+  autoHire          Boolean   @default(false)
+  autoHireWindowMin Int       @default(180)
+  autoHireDecideAt  DateTime?
+  autoHireDoneAt    DateTime?
+
   hr           User          @relation(fields: [hrId], references: [id], onDelete: Cascade)
   position     Position      @relation(fields: [positionId], references: [id])
   applications Application[]
 
   @@index([shiftStart])
   @@index([status, shiftStart])
+  @@index([autoHire, autoHireDoneAt, autoHireDecideAt])
 }
 
 model Application {
