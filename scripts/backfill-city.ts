@@ -3,8 +3,13 @@
 // нет или они из разных городов, не трогает: выдумывать город за человека
 // нельзя, а «Москва по умолчанию» — ровно выдумывание.
 //
-//   npx tsx scripts/backfill-city.ts           # показать, что изменится
+//   npx tsx scripts/backfill-city.ts                      # показать, что изменится
 //   npx tsx scripts/backfill-city.ts --apply
+//   npx tsx scripts/backfill-city.ts --prefer "Москва"    # снять неоднозначность
+//
+// «Маяковская» есть и в Москве, и в Петербурге, «Автозаводская» — в Москве и
+// Нижнем. Сами по себе такие станции город не определяют; --prefer говорит,
+// какой город выбрать, если станция в нём есть.
 //
 import { PrismaClient } from "@prisma/client";
 import { METRO_CITIES } from "@/lib/domain/metro";
@@ -13,6 +18,8 @@ import { sanitizeMetroInput } from "@/lib/domain/metro-input";
 import { reindexWorker } from "@/lib/domain/worker-index";
 
 const apply = process.argv.includes("--apply");
+const preferIndex = process.argv.indexOf("--prefer");
+const prefer = preferIndex >= 0 ? process.argv[preferIndex + 1] ?? null : null;
 const prisma = new PrismaClient();
 
 /** Город, которому принадлежат ВСЕ станции профиля; иначе null. */
@@ -23,7 +30,11 @@ function cityOfStations(metro: string | null): string | null {
   const cities = METRO_CITIES.filter((city) =>
     names.every((name) => findStationOffline(city, name)),
   );
-  return cities.length === 1 ? cities[0] : null;
+  if (cities.length === 1) return cities[0];
+  if (prefer && cities.some((c) => c.toLowerCase() === prefer.toLowerCase())) {
+    return cities.find((c) => c.toLowerCase() === prefer.toLowerCase()) ?? null;
+  }
+  return null;
 }
 
 async function main() {
